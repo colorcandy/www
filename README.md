@@ -1,3 +1,11 @@
+[ksib01@nbitbat1 log]$ cd ${KS_HOME}/bin;./ksss0000.sh CFH3501
+
+バッチ開始
+.::/ks/KSIB01/bin/../jbin/kosei-batch.jar
+ジョブ名: CFH3501
+設定クラス: jp.co.nttcom.kosei.batch.ss.config.jobs.CFH3501JobConfig
+ジョブ: cfh3501Job
+パラメータ: 
 2026-08-10 17:01:33 658,,,,W,,Bean 'dataSourceConfig' of type [jp.co.nttcom.kosei.batch.ss.config.infra.DataSourceConfig$$SpringCGLIB$$0] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor []? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
 2026-08-10 17:01:33 690,,,,W,,Bean 'jobDataSource' of type [org.apache.commons.dbcp2.BasicDataSource] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor []? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
 2026-08-10 17:01:33 825,,,,W,,Bean 'jobSqlSessionFactory' of type [org.apache.ibatis.session.defaults.DefaultSqlSessionFactory] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor []? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
@@ -11,7 +19,37 @@
 2026-08-10 17:01:35 015,,,,W,,Bean 'koseiMessageAccessor' of type [jp.co.nttcom.kosei.common.ss.internal.message.KoseiMessageAccessorImpl] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [koseiLoggerInjector]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
 2026-08-10 17:01:35 016,,,,W,,Bean 'koseiBatchLoggerFactory' of type [jp.co.nttcom.kosei.batch.ss.internal.logger.KoseiBatchLoggerFactory] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [koseiLoggerInjector]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
 2026-08-10 17:01:35 093,,,,W,,Unable to determine dialect of the StAX implementation at jar:file:/ks/KSIB01/jbin/kosei-batch.jar!/
+Initializing innorules modules...
+License Information
+    License ID: NTTドコモソリューションズ株式会社
+    Description: 厚生系統合システム開発ITサーバ
+    Expiration: 2027-02-28
+    Core Limit: 4
+    Provide Key: JP-IR8-20250212-A
+    Rule System []
+        Rule Count: Unlimited
+        Account Count: Unlimited
+
+Applying the configuration 'irclient-clusters' using rule module 'com.innoexpert.rulesclient.initializer.RuleInterfaceClusterInitializer'...
+[CREATE-INTERFACE-CLUSTER][BEGIN] rulesclient
+[CREATE-INTERFACE-CLUSTER][SUCCESS] rulesclient
+Applying the configuration 'irclient-clusters' has been completed.
+All Innorules module initialization processes has been completed.
+License Information
+    License ID: NTTドコモソリューションズ株式会社
+    Description: 厚生系統合システム開発ITサーバ
+    Expiration: 2027-02-28
+    Core Limit: 4
+    Provide Key: JP-IR8-20250212-A
+    Rule System []
+        Rule Count: Unlimited
+        Account Count: Unlimited
+
 2026-08-10 17:01:39 307,0000676590,CFH3501,-------,I,---------,ジョブ実行ID: 2080
 2026-08-10 17:01:39 313,0000676590,CFH3501,-------,I,SSB00I001,標準報酬算入依頼ファイル作成 処理開始
 2026-08-10 17:04:38 104,0000676590,CFH3501,-------,I,CFH35I001,[ファイル:標準報酬算入依頼ファイル] 出力件数:16,401
 2026-08-10 17:04:38 140,0000676590,CFH3501,-------,I,SSB00I002,標準報酬算入依頼ファイル作成 処理終了
+Destroying Innorules modules...
+Innorules module destroying processes has been completed.
+バッチ正常終了
+[ksib01@nbitbat1 bin]$ 
