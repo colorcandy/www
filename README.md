@@ -1,25 +1,17 @@
-SELECT
-    s.name_cd,
-    s.kojo_ym,
-    s.kyuyo_sikyukaisha_cd,
-    s.sekyutaisyo_cd,
-    s.kojo_taishogai_flg,
-    k.rec_sbt,
-    k.sytteinen_tekiyo_kbn_cd
-FROM public.gym_shain_ippijoho s
-INNER JOIN public.gym_seikyu_kanri k
-    ON s.kojo_ym = k.kojo_ym
-   AND s.name_cd = k.name_cd
-WHERE EXISTS (
-    SELECT 1
-    FROM public.gym_batch_soko_kanri b
-    WHERE b.kyuyosetuzoku_sokom = s.kojo_ym
-)
-  AND k.rec_sbt = '0'
-  AND k.sytteinen_tekiyo_kbn_cd = '0'
-  AND s.sekyutaisyo_cd <> '3'
-  AND s.kojo_taishogai_flg <> '1'
-  AND s.kyuyo_sikyukaisha_cd IN ('A', 'B', 'C')
-ORDER BY
-    s.kyuyo_sikyukaisha_cd,
-    s.name_cd;
+2026-08-10 17:01:33 658,,,,W,,Bean 'dataSourceConfig' of type [jp.co.nttcom.kosei.batch.ss.config.infra.DataSourceConfig$$SpringCGLIB$$0] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor []? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-08-10 17:01:33 690,,,,W,,Bean 'jobDataSource' of type [org.apache.commons.dbcp2.BasicDataSource] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor []? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-08-10 17:01:33 825,,,,W,,Bean 'jobSqlSessionFactory' of type [org.apache.ibatis.session.defaults.DefaultSqlSessionFactory] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor []? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-08-10 17:01:33 903,,,,W,,Bean 'SSGymCodeListDao' of type [org.mybatis.spring.mapper.MapperFactoryBean] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor []? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-08-10 17:01:33 911,,,,W,,Bean 'SSGymCodeListDao' of type [jdk.proxy2.$Proxy40] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor []? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-08-10 17:01:33 917,,,,W,,Bean 'koseiI18nAccesser' of type [jp.co.nttcom.kosei.common.ss.internal.i18n.KoseiI18nAccesserImpl] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor []? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-08-10 17:01:33 920,,,,W,,Bean 'koseiI18nCodeListDBRegister' of type [jp.co.nttcom.kosei.common.ss.internal.codelist.db.KoseiI18nCodeListDBRegister] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor []? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-08-10 17:01:34 997,,,,W,,Bean 'koseiCodeListInitializer' of type [jp.co.nttcom.kosei.common.ss.internal.codelist.KoseiCodeListInitializer] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor []? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-08-10 17:01:35 006,,,,W,,Bean 'messageConfig' of type [jp.co.nttcom.kosei.batch.ss.config.infra.MessageConfig$$SpringCGLIB$$0] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [koseiLoggerInjector]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-08-10 17:01:35 011,,,,W,,Bean 'messageSource' of type [org.springframework.context.support.ResourceBundleMessageSource] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [koseiLoggerInjector]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-08-10 17:01:35 015,,,,W,,Bean 'koseiMessageAccessor' of type [jp.co.nttcom.kosei.common.ss.internal.message.KoseiMessageAccessorImpl] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [koseiLoggerInjector]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-08-10 17:01:35 016,,,,W,,Bean 'koseiBatchLoggerFactory' of type [jp.co.nttcom.kosei.batch.ss.internal.logger.KoseiBatchLoggerFactory] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [koseiLoggerInjector]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
+2026-08-10 17:01:35 093,,,,W,,Unable to determine dialect of the StAX implementation at jar:file:/ks/KSIB01/jbin/kosei-batch.jar!/
+2026-08-10 17:01:39 307,0000676590,CFH3501,-------,I,---------,ジョブ実行ID: 2080
+2026-08-10 17:01:39 313,0000676590,CFH3501,-------,I,SSB00I001,標準報酬算入依頼ファイル作成 処理開始
+2026-08-10 17:04:38 104,0000676590,CFH3501,-------,I,CFH35I001,[ファイル:標準報酬算入依頼ファイル] 出力件数:16,401
+2026-08-10 17:04:38 140,0000676590,CFH3501,-------,I,SSB00I002,標準報酬算入依頼ファイル作成 処理終了
