@@ -1,55 +1,66 @@
-[ksib01@nbitbat1 log]$ cd ${KS_HOME}/bin;./ksss0000.sh CFH3501
+package jp.co.nttcom.kosei.batch.ss.config.jobs;
 
-バッチ開始
-.::/ks/KSIB01/bin/../jbin/kosei-batch.jar
-ジョブ名: CFH3501
-設定クラス: jp.co.nttcom.kosei.batch.ss.config.jobs.CFH3501JobConfig
-ジョブ: cfh3501Job
-パラメータ: 
-2026-08-10 17:01:33 658,,,,W,,Bean 'dataSourceConfig' of type [jp.co.nttcom.kosei.batch.ss.config.infra.DataSourceConfig$$SpringCGLIB$$0] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor []? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
-2026-08-10 17:01:33 690,,,,W,,Bean 'jobDataSource' of type [org.apache.commons.dbcp2.BasicDataSource] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor []? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
-2026-08-10 17:01:33 825,,,,W,,Bean 'jobSqlSessionFactory' of type [org.apache.ibatis.session.defaults.DefaultSqlSessionFactory] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor []? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
-2026-08-10 17:01:33 903,,,,W,,Bean 'SSGymCodeListDao' of type [org.mybatis.spring.mapper.MapperFactoryBean] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor []? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
-2026-08-10 17:01:33 911,,,,W,,Bean 'SSGymCodeListDao' of type [jdk.proxy2.$Proxy40] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor []? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
-2026-08-10 17:01:33 917,,,,W,,Bean 'koseiI18nAccesser' of type [jp.co.nttcom.kosei.common.ss.internal.i18n.KoseiI18nAccesserImpl] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor []? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
-2026-08-10 17:01:33 920,,,,W,,Bean 'koseiI18nCodeListDBRegister' of type [jp.co.nttcom.kosei.common.ss.internal.codelist.db.KoseiI18nCodeListDBRegister] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor []? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
-2026-08-10 17:01:34 997,,,,W,,Bean 'koseiCodeListInitializer' of type [jp.co.nttcom.kosei.common.ss.internal.codelist.KoseiCodeListInitializer] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor []? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
-2026-08-10 17:01:35 006,,,,W,,Bean 'messageConfig' of type [jp.co.nttcom.kosei.batch.ss.config.infra.MessageConfig$$SpringCGLIB$$0] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [koseiLoggerInjector]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
-2026-08-10 17:01:35 011,,,,W,,Bean 'messageSource' of type [org.springframework.context.support.ResourceBundleMessageSource] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [koseiLoggerInjector]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
-2026-08-10 17:01:35 015,,,,W,,Bean 'koseiMessageAccessor' of type [jp.co.nttcom.kosei.common.ss.internal.message.KoseiMessageAccessorImpl] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [koseiLoggerInjector]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
-2026-08-10 17:01:35 016,,,,W,,Bean 'koseiBatchLoggerFactory' of type [jp.co.nttcom.kosei.batch.ss.internal.logger.KoseiBatchLoggerFactory] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected/applied to a currently created BeanPostProcessor [koseiLoggerInjector]? Check the corresponding BeanPostProcessor declaration and its dependencies/advisors. If this bean does not have to be post-processed, declare it with ROLE_INFRASTRUCTURE.
-2026-08-10 17:01:35 093,,,,W,,Unable to determine dialect of the StAX implementation at jar:file:/ks/KSIB01/jbin/kosei-batch.jar!/
-Initializing innorules modules...
-License Information
-    License ID: NTTドコモソリューションズ株式会社
-    Description: 厚生系統合システム開発ITサーバ
-    Expiration: 2027-02-28
-    Core Limit: 4
-    Provide Key: JP-IR8-20250212-A
-    Rule System []
-        Rule Count: Unlimited
-        Account Count: Unlimited
+import jp.co.nttcom.kosei.batch.cf.cfh35.CFH3501Tasklet;
+import jp.co.nttcom.kosei.common.ss.batch.params.CFH3501JobParams;
 
-Applying the configuration 'irclient-clusters' using rule module 'com.innoexpert.rulesclient.initializer.RuleInterfaceClusterInitializer'...
-[CREATE-INTERFACE-CLUSTER][BEGIN] rulesclient
-[CREATE-INTERFACE-CLUSTER][SUCCESS] rulesclient
-Applying the configuration 'irclient-clusters' has been completed.
-All Innorules module initialization processes has been completed.
-License Information
-    License ID: NTTドコモソリューションズ株式会社
-    Description: 厚生系統合システム開発ITサーバ
-    Expiration: 2027-02-28
-    Core Limit: 4
-    Provide Key: JP-IR8-20250212-A
-    Rule System []
-        Rule Count: Unlimited
-        Account Count: Unlimited
+import org.springframework.batch.core.Job;
+import org.springframework.batch.core.Step;
+import org.springframework.batch.core.job.builder.JobBuilder;
+import org.springframework.batch.core.repository.JobRepository;
+import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.transaction.PlatformTransactionManager;
 
-2026-08-10 17:01:39 307,0000676590,CFH3501,-------,I,---------,ジョブ実行ID: 2080
-2026-08-10 17:01:39 313,0000676590,CFH3501,-------,I,SSB00I001,標準報酬算入依頼ファイル作成 処理開始
-2026-08-10 17:04:38 104,0000676590,CFH3501,-------,I,CFH35I001,[ファイル:標準報酬算入依頼ファイル] 出力件数:16,401
-2026-08-10 17:04:38 140,0000676590,CFH3501,-------,I,SSB00I002,標準報酬算入依頼ファイル作成 処理終了
-Destroying Innorules modules...
-Innorules module destroying processes has been completed.
-バッチ正常終了
-[ksib01@nbitbat1 bin]$ 
+/**
+ * <p>[概 要] CFH3501_標準報酬算入依頼ファイル作成 ジョブ定義</p>
+ * <p>[詳 細] <br>
+ * Terasolunaバッチ５系 Taskletモデル。
+ * </p>
+ * <p>[備 考] </p>
+ * <p>[環 境] JRE 21</p>
+ * <p>Copyright © NTT DOCOMO SOLUTIONS, Inc.</p>
+ *
+ * @version 1.0
+ * @author ビジネストランスフォーメーション本部 コーポレートビジネスソリューション部
+ */
+@ComponentScan(basePackages = "jp.co.nttcom.kosei.batch.cf.cfh35")
+public class CFH3501JobConfig extends KoseiJobConfig {
+
+    /**
+     * <p>[概 要] 「CFH3501」ステップ定義１</p>
+     * <p>[詳 細] 標準報酬算入依頼ファイル作成ステップ</p>
+     *
+     * @param jobRepository ジョブリポジトリ
+     * @param transactionManager トランザクションマネージャ
+     * @param tasklet タスクレットオブジェクト
+     * @return ステップオブジェクト
+     */
+    @Bean
+    public Step cfh3501Step01(JobRepository jobRepository,
+            @Qualifier("jobTransactionManager") PlatformTransactionManager transactionManager,
+            CFH3501Tasklet tasklet) {
+        return new StepBuilder(CFH3501JobParams.JOB_NAME + ".step01", jobRepository)
+                .tasklet(tasklet, transactionManager)
+                .listener(koseiStepExecutionListener)
+                .build();
+    }
+
+    /**
+     * <p>[概 要] 「CFH3501」ジョブ定義</p>
+     * <p>[詳 細] 標準報酬算入依頼ファイル作成ジョブ</p>
+     *
+     * @param jobRepository ジョブリポジトリ
+     * @param step01 ステップ１オブジェクト
+     * @return ジョブオブジェクト
+     */
+    @Bean
+    public Job cfh3501Job(JobRepository jobRepository,
+            @Qualifier("cfh3501Step01") Step step01) {
+        return new JobBuilder(CFH3501JobParams.JOB_NAME, jobRepository)
+                .start(step01)
+                .listener(koseiJobExecutionListener)
+                .build();
+    }
+}
