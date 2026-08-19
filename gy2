@@ -1,0 +1,3373 @@
+package jp.co.nttcom.kosei.batch.gy.gyc08;
+
+import static jp.co.nttcom.kosei.batch.ss.message.KoseiBatchSSMessageId.SSB00E003;
+import static jp.co.nttcom.kosei.batch.ss.message.KoseiBatchSSMessageId.SSB00E004;
+import static jp.co.nttcom.kosei.batch.ss.message.KoseiBatchSSMessageId.SSB00E008;
+import static jp.co.nttcom.kosei.batch.ss.message.KoseiBatchSSMessageId.SSB00F003;
+import static jp.co.nttcom.kosei.batch.ss.message.KoseiBatchSSMessageId.SSB00F999;
+
+import jp.co.nttcom.kosei.batch.common.gy.GYGymCycleBangouDao;
+import jp.co.nttcom.kosei.batch.common.gy.GyGymCycleBangouDto;
+import jp.co.nttcom.kosei.batch.common.gy.gyc.GYCIdoJohoConst;
+import jp.co.nttcom.kosei.batch.common.gy.gyc.GYCIdoJohoDao;
+import jp.co.nttcom.kosei.batch.common.gy.gyc.GYCIdoJohoDtoAbst;
+import jp.co.nttcom.kosei.batch.common.gy.gyc.GYCIdoJohoHDto;
+import jp.co.nttcom.kosei.batch.common.gy.gyc.GYCIdoJohoIdoJyhDto;
+import jp.co.nttcom.kosei.batch.common.gy.gyc.GYCIdoJohoKyusyokuJyhDto;
+import jp.co.nttcom.kosei.batch.common.gy.gyc.GYCIdoJohoMsgWDto;
+import jp.co.nttcom.kosei.batch.common.gy.gyc.GYCIdoJohoSinJyhDto;
+import jp.co.nttcom.kosei.batch.common.gy.gyc.GYCIdoJohoSyukkoDto;
+import jp.co.nttcom.kosei.batch.common.gy.gyc.GYCIdoJohoTaishokuJyhDto;
+import jp.co.nttcom.kosei.batch.common.gy.gyc.GYCIdoJohoTensekiJyhDto;
+import jp.co.nttcom.kosei.batch.common.gy.gyc.GYCJsysCodechgDto;
+import jp.co.nttcom.kosei.batch.common.gy.gyc.GYCShainJohoDto;
+import jp.co.nttcom.kosei.batch.common.gy.gyc.IdoJohohException;
+import jp.co.nttcom.kosei.batch.ss.exception.KoseiBatchException;
+
+import jp.co.nttcom.kosei.batch.ss.util.KoseiOutputListUtils;
+import jp.co.nttcom.kosei.common.ss.exception.KoseiFileException;
+import jp.co.nttcom.kosei.common.ss.exception.KoseiSystemException;
+import jp.co.nttcom.kosei.common.ss.logger.KoseiLogger;
+import jp.co.nttcom.kosei.common.ss.logger.KoseiLoggerInject;
+import jp.co.nttcom.kosei.common.ss.message.KoseiMessageAccessor;
+import jp.co.nttcom.kosei.common.ss.message.KoseiMessages;
+import jp.co.nttcom.kosei.common.ss.util.KoseiDateFactory;
+import jp.co.nttcom.kosei.common.ss.util.KoseiDateUtils;
+import jp.co.nttcom.kosei.common.ss.util.KoseiProperties;
+import jp.co.nttcom.kosei.common.ss.util.KoseiStringUtils;
+import jp.co.nttcom.kosei.batch.ss.util.KoseiBatchUtils;
+import jp.co.nttcom.kosei.common.ss.file.model.KoseiVariableDto;
+import jp.co.nttcom.kosei.common.ss.file.service.KoseiVariableItemWriter;
+import org.apache.ibatis.cursor.Cursor;
+
+import com.github.dozermapper.core.Mapper;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.validation.Validator;
+import org.terasoluna.gfw.common.codelist.CodeList;
+
+import java.io.File;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.text.MessageFormat;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
+
+/**
+ * <p>[概 要] 人事異動情報振分実行クラス/p>
+ * <p>[詳 細] </p>
+ * <p>[備 考] </p>
+ * <p>[環 境] JRE 21</p>
+ * <p>Copyright © NTT DOCOMO SOLUTIONS, Inc.</p>
+ * 
+ * @version $Revision$
+ * @author ビジネストランスフォーメーション本部 コーポレートビジネスソリューション部
+ */
+@Component
+public class GYC0801MainLogic {
+
+
+    /**
+     * 戻り値（正常）
+     */
+    private static final int OK = 0;
+
+    /**
+     * 戻り値（異常）
+     */
+    private static final int NG = -1;
+
+    /**
+     * 有効フラグ（有効）
+     */
+    private static final String YUKO = "1";
+
+    /**
+     * 有効フラグ（無効）
+     */
+    private static final String MUKO = "0";
+
+    /**
+     * ファイル拡張子
+     */
+    private static final String ERROR_LIST_SUFFIX_PROP_KEY = "ss.error.list.suffix";
+
+    /**
+     * パディング(0)
+     */
+    private static final char PAD_CHAR = '0';
+
+    /**
+     * パディング(行数)
+     */
+    private static final int PAD_LEN = 3;
+
+    /**
+     * 処理結果ファイル
+     */
+    private static final int FILE_TYPE_RST = 1;
+
+    /**
+     * 処理結果ファイル
+     */
+    private static final int FILE_TYPE_ERR = 2;
+
+    /**
+     * 出向種別：在A
+     */
+    private static final String ZAI_A = "2";
+
+
+
+    /**
+     * 機能ID
+     */
+    @Value("${GYC0801.id}")
+    private String functionId;
+
+
+    /**
+     * 機能名称
+     */
+    @Value("${GYC0801.name}")
+    private String functionName;
+
+
+    /**
+     * コミット上限
+     */
+    @Value("${GYC0801.commit.count}")
+    private int commitLimit;
+
+
+    /**
+     * 処理結果リスト／エラーリスト出力先（スケジュール起動用）
+     */
+    @Value("${GYG0201.file.output.dir}")
+    private String listOutputDirBatch;
+
+
+    /**
+     * 人事異動情報エラーダンプリスト作成 処理結果ファイル出力用ディレクトリ（オンバッチ）
+     */
+    @Value("${GYG0101.file.output.dir}")
+    private String onBatListOutputDirOnbat;
+
+
+    /**
+     * 更新結果メッセージのテンプレート
+     */
+    private static final String RST_MSG1 = "追加：氏名コード＝{0};氏名＝{1};会社名＝{2};組織名＝{3}";
+
+    /**
+     * 更新結果メッセージのテンプレート
+     */
+    private static final String RST_MSG2 = "追加：氏名コード＝{0}";
+
+    /**
+     * その他人給の和名
+     */
+    private static final String JSYS_SONOT_NM = "その他";
+
+
+    /**
+     * SPEAD(異動コード：死亡）
+     */
+    private static final String SPEAD_IDO_CD_SIBO = "860";
+
+    /**
+     * SPEAD(退職事由コード：死亡候補 35:公務上（公傷病））
+     */
+    private static final String SPEAD_TAIJI_CD_SIBO1 = "35";
+    /**
+     * SPEAD(退職事由コード：死亡候補 36:公務上（私傷病））
+     */
+    private static final String SPEAD_TAIJI_CD_SIBO2 = "36";
+    /**
+     * SPEAD(退職事由コード：死亡候補 37:公務外（公傷病））
+     */
+    private static final String SPEAD_TAIJI_CD_SIBO3 = "37";
+    /**
+     * SPEAD(退職事由コード：死亡候補 38:公務外（私傷病））
+     */
+    private static final String SPEAD_TAIJI_CD_SIBO4 = "38";
+
+
+    /**
+     * 業務日付取得
+     */
+    @Inject
+    private KoseiDateFactory dateFactory;
+
+    /**
+     * トランザクション管理
+     */
+    @Inject
+    @Qualifier("jobTransactionManager")
+    private PlatformTransactionManager transactionManager;
+
+
+    /**
+     * ログ出力オブジェクト（インジェクト）
+     */
+    @KoseiLoggerInject
+    private KoseiLogger klogger;
+
+    /**
+     * jsysCodeList 給与計算システム種別コード(人事システムコード）を名称に変換
+     */
+    @Inject
+    @Named("CL_GY099")
+    private CodeList jsysCodeList;
+
+
+    /**
+     * 汎用データ抽出用DAO.
+     */
+    @Inject
+    private GYC08Dao gyc08Dao;
+
+
+    /**
+     * 異動情報共通用DAO.
+     */
+    @Inject
+    private GYCIdoJohoDao gYCIdoJohoDao;
+
+
+
+    /**
+     * サイクル番号用DAO.
+     */
+    @Inject
+    private GYGymCycleBangouDao cycleBangouDao;
+
+    /**
+     * Mapperオブジェクト（インジェクト）
+     */
+    @Inject
+    private Mapper mapper;
+
+    /**
+     * バリデーションチェックオブジェクト（インジェクト）
+     */
+    @Inject
+    private Validator validator;
+
+
+    /**
+     * メッセージ本文取得オブジェクト（インジェクト）
+     */
+    @Inject
+    private KoseiMessageAccessor messageAccessor;
+
+
+    /**
+     * 社員情報処理クラス（インジェクト）
+     */
+    @Inject
+    private GYC08IdoJohoSinJyhProc gYCIdoJohoSinJyhProc;
+
+    /**
+     * 異動情報処理クラス（インジェクト）
+     */
+    @Inject
+    private GYC08IdoJohoIdoJyhProc gYCIdoJohoIdoJyhProc;
+
+
+    /**
+     * 休職情報処理クラス（インジェクト）
+     */
+    @Inject
+    private GYC08IdoJohoKyusyokuJyhProc gYCIdoJohoKyusyokuJyhProc;
+
+
+    /**
+     * 出向情報処理クラス（インジェクト）
+     */
+    @Inject
+    private GYC08IdoJohoSyukkoProc gYCIdoJohoSyukkoProc;
+
+    /**
+     * 退職情報処理クラス（インジェクト）
+     */
+    @Inject
+    private GYC08IdoJohoTaishokuJyhProc gYCIdoJohoTaishokuJyhProc;
+
+    /**
+     * 転籍情報処理クラス（インジェクト）
+     */
+    @Inject
+    private GYC08IdoJohoTensekiJyhProc gYCIdoJohoTensekiJyhProc;
+
+
+
+    /**
+     * トランザクション
+     */
+    private TransactionStatus transactionStatus;
+
+    /**
+     * 人事異動情報振分処理結果リスト
+     *
+     */
+    KoseiVariableItemWriter<GYC08IdoJohoMsgWRstFileDto, KoseiVariableDto.None, KoseiVariableDto.None, KoseiVariableDto.None> rstlistFileLineWriter = null;
+
+
+    /**
+     * 人事異動情報振分エラーリスト
+     */
+    KoseiVariableItemWriter<GYC08IdoJohoMsgWErrFileDto, KoseiVariableDto.None, KoseiVariableDto.None, KoseiVariableDto.None> errlistFileLineWriter = null;
+
+    /**
+     * 人給システムコード変換キャッシュ用
+     */
+    private HashMap<String, String> jsysCodeChgMap = new HashMap<>();
+
+    /**
+     * 業務日付プラス(日次バッチ時:業務日付+1日, オンバッチ時:業務日付)
+     */
+    private LocalDate gymHizukePlus;
+    
+    /**
+     * 返却用コード 0:正常終了、50：条件付き正常終了
+     */
+    private int rtnCd = 0;
+
+    /**
+     * ＮＢＬＳ社員区分変換キャッシュ用
+     */
+    private HashMap<String, String> sihKbnMap = new HashMap<>();
+
+    /**
+     * <p>[概 要] execute メソッド。</p>
+     * <p>[詳 細] 人事異動情報振分処理のメインロジック</p>
+     * <p>[備 考] </p>
+     * 
+     * @param batchKbn バッチ区分
+     * @param userId ユーザＩＤ
+     * @param transactionStatus トランザクション状態
+     * @param jobSeqId ジョブシーケンス番号
+     * @return ジョブ終了コード
+     * @throws KoseiBatchException 業務例外
+     */
+    public int execute(String batchKbn, String userId,
+            TransactionStatus transactionStatus, String jobSeqId) {
+
+        try {
+
+            this.klogger.debug("異動情報振分処理　実行部　Start");
+
+            this.transactionStatus = transactionStatus;
+
+
+
+            // 業務日付取得
+            LocalDate gymHizuke = dateFactory.getBusinessDate();
+            String gymHizukeStr =
+                    gymHizuke.format(KoseiDateUtils.getJPyyyyMMddFormatter());
+            gymHizukePlus = gymHizuke;
+
+            // 人事異動情報振分処理結果出力先ファイルパス
+            Path rstListFilePath = null;
+            // 人事異動情報振分エラーリスト出力先ファイルパス
+            Path errListFilePath = null;
+
+
+            // バッチ区分に応じて出力先設定
+            if ("99".equals(batchKbn)) {
+                // オンバッチ
+
+                // 出力ディレクトリ作成
+                String onBatOutputDir =
+                        this.onBatListOutputDirOnbat + jobSeqId + File.separator;
+                File outFile = new File(onBatOutputDir);
+
+                if (!outFile.exists()) {
+                    if (!outFile.mkdirs()) {
+                        // 作成エラーの場合は致命的エラー（システムエラー）
+                        throw new KoseiSystemException(
+                                SSB00F999.value());
+                    }
+                } else {
+                    // 既存のファイルはすべて削除
+                    // File[] files = outFile.listFiles();
+                    // for(int i=0; i < files.length; i++) {
+                    // files[i].delete();
+                    // }
+                }
+
+                // 人事異動情報ダンプ出力ファイル名(処理結果リストファイル)
+                String onBatRstFileName = KoseiOutputListUtils.getResultListFileName(
+                        this.functionName, this.dateFactory.newLocalDateTime());
+
+                // 人事異動情報振分処理結果出力先ファイルパス
+                rstListFilePath = Paths.get(onBatOutputDir, onBatRstFileName);
+
+                // 人事異動情報ダンプ出力ファイル名(オンバッチ エラーリスト）
+                String onBatErrFileName = KoseiOutputListUtils.getErrorListFileName(
+                        this.functionName, this.dateFactory.newLocalDateTime());
+
+                // 人事異動情報振分エラーリスト出力先ファイルパス
+                errListFilePath = Paths.get(onBatOutputDir, onBatErrFileName);
+
+            } else {
+                // 日次バッチ
+                gymHizukePlus = gymHizukePlus.plusDays(1);
+
+                // サイクル番号取得
+                GyGymCycleBangouDto cycleBangouDto = cycleBangouDao.findOneCycleNum();
+                String cycleBangou = KoseiStringUtils.lpadding(
+                        String.valueOf(cycleBangouDto.getCycleNogenzai()), PAD_LEN,
+                        PAD_CHAR);
+
+                // 人事異動情報振分出力ファイル名
+                String listFileName =
+                        getIdoJohoFuriFileName(functionId, cycleBangou, gymHizukeStr);
+
+                String rstListOutputDir =
+                        this.listOutputDirBatch + "gyc08f01" + File.separator;
+                String errListOutputDir =
+                        this.listOutputDirBatch + "gyc08f02" + File.separator;
+
+                // 人事異動情報振分処理結果出力先ファイルパス
+                rstListFilePath = Paths.get(rstListOutputDir, listFileName);
+                // 人事異動情報振分エラーリスト出力先ファイルパス
+                errListFilePath = Paths.get(errListOutputDir, listFileName);
+
+            }
+
+            // 会社コード変換情報作成
+            Map<String, String> kaishaChgMap = new HashMap<>();
+            // 人事異動情報抽出情報のcursor取得
+            transactionStatus = KoseiBatchUtils.startTransaction(transactionManager);
+            try (Cursor<GYCJsysCodechgDto> colCodeChgKaishaDto =
+                    gYCIdoJohoDao.findKaishaChgCodeList(
+                            GYCIdoJohoConst.TOUITSUCD_KAISYACD)) {
+
+                for (GYCJsysCodechgDto gYC08JsysCodechgDto : colCodeChgKaishaDto) {
+
+                    // DTOからデータを取得
+                    String key = gYC08JsysCodechgDto.getJsysSbtCd() + "/"
+                            + gYC08JsysCodechgDto.getJsysbetsuCd();
+                    kaishaChgMap.put(key, gYC08JsysCodechgDto.getToitsuCd());
+                    this.klogger.debug("    jsysCd:{} sbtCd:{} toiCd:{}",
+                            gYC08JsysCodechgDto.getJsysSbtCd(),
+                            gYC08JsysCodechgDto.getJsysbetsuCd(),
+                            gYC08JsysCodechgDto.getToitsuCd());
+                }
+            KoseiBatchUtils.commitTransaction(transactionManager, transactionStatus);
+
+            } catch (Exception e) {
+                KoseiBatchUtils.endTransaction(transactionManager, transactionStatus);
+                throw new KoseiBatchException(SSB00F003, e);
+            }
+
+
+            // 人事異動情報抽出情報のcollector取得
+            // Collector<GYC08IdoJohoCDto> colGYC08IdoJohoCDto =
+            // new DaoCollector<>(gyc08Dao, "findIdoJohoCList", null);
+
+            List<GYC08IdoJohoCDto> gYC08IdoJohoCDtoList = null;
+            gYC08IdoJohoCDtoList = this.gyc08Dao.findIdoJohoCList();
+
+            try {
+                try {
+                    // 人事異動情報振分処理結果ライター生成
+                    rstlistFileLineWriter = new KoseiVariableItemWriter.Builder<>(
+                            GYC08IdoJohoMsgWRstFileLayout.class)
+                            .filePath(rstListFilePath.toString())
+                            .shouldDeleteIfEmpty(false)
+                            .build();
+                    // ファイルオープン
+                    rstlistFileLineWriter.open();
+                } catch (KoseiFileException e) {
+                    // ファイルオープンエラー
+                    throw new KoseiBatchException(SSB00E003, e,
+                            rstListFilePath);
+                }
+                try {
+
+                    // 人事異動情報振分エラーリストライター生成
+                    errlistFileLineWriter = new KoseiVariableItemWriter.Builder<>(
+                            GYC08IdoJohoMsgWErrFileLayout.class)
+                            .filePath(errListFilePath.toString())
+                            .shouldDeleteIfEmpty(false)
+                            .build();
+                    // ファイルオープン
+                    errlistFileLineWriter.open();
+                } catch (KoseiFileException e) {
+                    // ファイルオープンエラー
+                    throw new KoseiBatchException(SSB00E003, e,
+                            errListFilePath);
+                }
+
+                try {
+                                    
+                    // 処理結果ファイルへヘッダーを出力
+                    rstlistFileLineWriter.writeTitle(GYC08IdoJohoMsgWRstFileDto.class);
+
+                    // エラーリストファイルヘッダーを出力
+                    errlistFileLineWriter.writeTitle(GYC08IdoJohoMsgWErrFileDto.class);
+                    // トレーラーレコード用 処理結果件数
+                    int inputCnt = 0;
+                    int nomalCnt = 0;
+                    int errorCnt = 0;
+
+                    // トランザクション用 DB実行中件数
+                    int dbExecutionCnt = 0;
+
+
+                    // 振分前ＤＴＯを生成
+                    GYC08IdoJohoHPDto gYC08IdoJohoHPDto = new GYC08IdoJohoHPDto();
+
+                    // 人事異動情報抽出ワーク用collectorの次要素が存在する間、以下の処理を実施する。
+                    // while (colGYC08IdoJohoCDto.hasNext()) {
+                    for (GYC08IdoJohoCDto gYC08IdoJohoCDto : gYC08IdoJohoCDtoList) {
+
+                        // 各処理結果コード
+                        int rtnCode = 0;
+
+                        // DBしかかり件数
+                        dbExecutionCnt++;
+
+                        // DTOからデータを取得
+                        // GYC08IdoJohoCDto gYC08IdoJohoCDto = colGYC08IdoJohoCDto.next();
+                        // 証跡フィールドは更新
+                        gYC08IdoJohoCDto
+                                .setCreateUserId(gYC08IdoJohoCDto.getOperUserId());
+                        gYC08IdoJohoCDto
+                                .setLastUpdateUserId(gYC08IdoJohoCDto.getOperUserId());
+                        // 証跡フィールド用ユーザID
+                        gYC08IdoJohoCDto.setOperUserId(userId);
+
+                        // 有効データのみ数える。
+                        if (YUKO.equals(gYC08IdoJohoCDto.getYukoRecFlg())) {
+                            // 入力
+                            inputCnt++;
+                        }
+
+                        // this.klogger.debug(" 抽出データ （ 社員氏名コード:{} 異動発生年月日:{} ）",
+                        // gYC08IdoJohoCDto.getNameCd(),gYC08IdoJohoCDto.getIdohasseinengappi()
+                        // );
+
+
+                        // 初回のみの対応
+                        if (KoseiStringUtils.isEmpty(gYC08IdoJohoHPDto.getNameCd())) {
+                            // 氏名コードを設定
+                            gYC08IdoJohoHPDto.setNameCd(gYC08IdoJohoCDto.getNameCd());
+                            // 異動発生年月日を設定
+                            gYC08IdoJohoHPDto.setIdohasseinengappi(
+                                    gYC08IdoJohoCDto.getIdohasseinengappi());
+                            // 業務日付
+                            gYC08IdoJohoHPDto.setGymHizuke(gymHizukePlus);
+                            // 会社コード変換マップ
+                            gYC08IdoJohoHPDto.setKaishaChgMap(kaishaChgMap);
+                            // 作成ユーザＩＤ
+                            gYC08IdoJohoHPDto.setCreateUserId(userId);
+                            // 最終更新ユーザＩＤ
+                            gYC08IdoJohoHPDto.setLastUpdateUserId(userId);
+
+                            // ログ出力
+                            this.klogger.debug(
+                                    "【 処理対象レコード 】 社員氏名コード:{} 異動発生年月日: {} ------>",
+                                    gYC08IdoJohoHPDto.getNameCd(),
+                                    gYC08IdoJohoHPDto.getIdohasseinengappi());
+                        }
+
+                        // 振分前ＤＴＯと取得した処理しているレコードの異動発生年月日と氏名コードが一致しない場合
+                        if (!(gYC08IdoJohoCDto.getNameCd()
+                                .equals(gYC08IdoJohoHPDto.getNameCd())
+                                && gYC08IdoJohoCDto.getIdohasseinengappi().equals(
+                                        gYC08IdoJohoHPDto.getIdohasseinengappi()))) {
+
+
+                            // 人事異動情報のチェックおよび登録処理
+                            doIdoJohoChkToroku(gYC08IdoJohoHPDto);
+                            // 正常登録件数
+                            nomalCnt = nomalCnt + gYC08IdoJohoHPDto.getNomalCnt();
+                            // エラー件数
+                            errorCnt = errorCnt + gYC08IdoJohoHPDto.getErrorCnt();
+
+                            if (GYCIdoJohoConst.BATCH_KBN_BATCH.equals(batchKbn)) {
+                                // DB処理件数とコミット上限件数を比較する
+                                if (dbExecutionCnt >= commitLimit) {
+                                    this.klogger.debug("    トランザクションの上限に達しました。 処理中件数： {}",
+                                            dbExecutionCnt);
+                                    // トランザクションのコミット
+                                    this.transactionStatus =
+                                            KoseiBatchUtils.commitRestartTransaction(
+                                                    this.transactionManager,
+                                                    this.transactionStatus);
+                                    // DB処理件数の初期化
+                                    dbExecutionCnt = 0;
+                                }
+                            }
+
+                            // 以下 振分前ＤＴＯ等 初期化 ----------------------------------->
+                            // 振分前ＤＴＯを生成
+                            gYC08IdoJohoHPDto = new GYC08IdoJohoHPDto();
+                            // 氏名コードを設定
+                            gYC08IdoJohoHPDto.setNameCd(gYC08IdoJohoCDto.getNameCd());
+                            // 異動発生年月日を設定
+                            gYC08IdoJohoHPDto.setIdohasseinengappi(
+                                    gYC08IdoJohoCDto.getIdohasseinengappi());
+                            // 業務日付
+                            gYC08IdoJohoHPDto.setGymHizuke(gymHizukePlus);
+                            // 会社コード変換マップ
+                            gYC08IdoJohoHPDto.setKaishaChgMap(kaishaChgMap);
+                            // 作成ユーザＩＤ
+                            gYC08IdoJohoHPDto.setCreateUserId(userId);
+                            // 最終更新ユーザＩＤ
+                            gYC08IdoJohoHPDto.setLastUpdateUserId(userId);
+
+                            // ログ出力
+                            this.klogger.debug(
+                                    "【 処理対象レコード 】 社員氏名コード:{} 異動発生年月日: {} ------>",
+                                    gYC08IdoJohoHPDto.getNameCd(),
+                                    gYC08IdoJohoHPDto.getIdohasseinengappi());
+
+                        }
+
+
+                        // 取得した人事異動抽出情報を人事異動情報振分前データに格納する。
+                        rtnCode = doIdoJohoFullset(gYC08IdoJohoCDto, gYC08IdoJohoHPDto);
+                        if (rtnCode != 0) {
+                            // 次レコードへ
+                            continue;
+                        }
+
+                    }
+
+                    // 人事異動情報のチェックおよび登録処理（最終処理レコード用の呼び出し）
+                    if (inputCnt > 0) {
+                        doIdoJohoChkToroku(gYC08IdoJohoHPDto);
+                    }
+                    // 正常登録件数
+                    nomalCnt = nomalCnt + gYC08IdoJohoHPDto.getNomalCnt();
+                    // エラー件数
+                    errorCnt = errorCnt + gYC08IdoJohoHPDto.getErrorCnt();
+                    
+                    // エラーが存在する場合、返却値用変数に50(条件付き正常終了)を設定
+                    if(errorCnt > 0) {
+                        rtnCd = 50;
+                    }
+
+                    // トレーラーレコードを出力
+                    createTrailer(inputCnt, nomalCnt, errorCnt, userId);
+
+                    if (GYCIdoJohoConst.BATCH_KBN_BATCH.equals(batchKbn)) {
+                        // トランザクションのコミット
+                        KoseiBatchUtils.commitTransaction(this.transactionManager,
+                                this.transactionStatus);
+                    }
+ 
+                    this.klogger.debug("異動情報振分処理　実行部　End");
+
+                } catch (KoseiFileException e) {
+                    // ファイル出力エラー
+                    throw new KoseiBatchException(SSB00E008, e);
+                }
+
+            } finally {
+
+                // ファイルクローズ処理
+                KoseiMessages messages = new KoseiMessages();
+
+                if (rstlistFileLineWriter != null) {
+                    try {
+                        // 処理結果ファイルクローズ
+                        rstlistFileLineWriter.close();
+                    } catch (KoseiFileException e) {
+                        // 処理結果ファイルクローズエラー
+                        messages.add(SSB00E004, e, e.getFileName());
+                    }
+                }
+
+
+                if (errlistFileLineWriter != null) {
+                    try {
+                        // エラーリストファイルクローズ
+                        errlistFileLineWriter.close();
+                    } catch (KoseiFileException e) {
+                        // エラーリストファイルクローズエラー
+                        messages.add(SSB00E004, e, e.getFileName());
+                    }
+                }
+
+                // エラーファイル時はエラーメッセージを設定してException返却
+                if (!messages.isEmpty()) {
+                    throw new KoseiBatchException(messages);
+                }
+
+            }
+
+        } finally {
+
+            if (GYCIdoJohoConst.BATCH_KBN_BATCH.equals(batchKbn)) {
+                // トランザクション終了（未コミット分はロールバック）
+                KoseiBatchUtils.endTransaction(this.transactionManager, this.transactionStatus);
+            }
+        }
+
+        // 処理結果コード0（正常）返却
+        return rtnCd;
+    }
+
+
+
+    /**
+     * <p>[概 要] doIdoJohoFullset メソッド。</p>
+     * <p>[詳 細] 取得した人事異動抽出情報を人事異動情報振分前DTOに格納する。</p>
+     * <p>[備 考] </p>
+     *
+     * @param gYC08IdoJohoCDto 人事異動抽出情報
+     * @param gYC08IdoJohoHPDto 人事異動情報振分前DTO
+     * @return 処理結果
+     */
+    private int doIdoJohoFullset(GYC08IdoJohoCDto gYC08IdoJohoCDto,
+            GYC08IdoJohoHPDto gYC08IdoJohoHPDto) {
+
+
+        this.klogger.debug("    抽出データ （  社員氏名コード:{} 異動発生年月日:{} ）",
+                gYC08IdoJohoCDto.getNameCd(), gYC08IdoJohoCDto.getIdohasseinengappi());
+
+
+        // 更新前ＤＴＯに異動情報を追加
+        gYC08IdoJohoHPDto.getLstGYC08IdoJohoCDto().add(gYC08IdoJohoCDto);
+
+        // すでにエラーが存在
+        if (gYC08IdoJohoHPDto.isErrFlg()) {
+            return OK;
+        }
+        // 抽出データの有効フラグが、無効の場合
+        if (GYCIdoJohoConst.YUKO_FLG_MUKO.equals(gYC08IdoJohoCDto.getYukoRecFlg())) {
+            // エラーフラグを設定
+            gYC08IdoJohoHPDto.setErrFlg(true);
+            return OK;
+        }
+
+        GYCIdoJohoDtoAbst idoDtoAbst = null;
+
+        switch (gYC08IdoJohoCDto.getIdoSbtCd()) {
+
+            // 社員情報
+            case GYCIdoJohoConst.SBT_SHAIN:
+
+                // 社員情報処理クラスを使用して共通処理を行う。
+                idoDtoAbst =
+                        doIdoSbtCommProc((GYC08IdoJohoFileProcAbst) gYCIdoJohoSinJyhProc,
+                                gYC08IdoJohoCDto, gYC08IdoJohoHPDto);
+                if (idoDtoAbst == null) {
+                    // エラーフラグを設定
+                    gYC08IdoJohoHPDto.setErrFlg(true);
+                } else {
+                    // エラーフラグを設定
+                    if (idoDtoAbst.isErrFlg())
+                        gYC08IdoJohoHPDto.setErrFlg(true);
+
+                    // トレーラーレコード用に会社名と組織名を取得し、変換前DTOに設定する。
+                    GYCIdoJohoSinJyhDto gYCIdoJohoSinJyhDto =
+                            (GYCIdoJohoSinJyhDto) idoDtoAbst;
+                    gYC08IdoJohoHPDto.setShimei(gYCIdoJohoSinJyhDto.getSNameKanjiSei()
+                            + " " + gYCIdoJohoSinJyhDto.getSNameKanjiMei());
+
+                    // 会社名、組織名を取得する。
+                    //20170215 修正
+                    //GYCKaishaSosikiNmDto paramDto = new GYCKaishaSosikiNmDto();
+                    GYC08KaishaSosikiNmDto paramDto = new GYC08KaishaSosikiNmDto();
+                    paramDto.setKaishaCd(gYCIdoJohoSinJyhDto.getSKaishaCd());
+                    paramDto.setSoshikiCd(gYCIdoJohoSinJyhDto.getSSoshikiCd());
+                    paramDto.setGyomuHizuke(gYC08IdoJohoHPDto.getGymHizuke());
+                    GYC08KaishaSosikiNmDto gYCKaishaSosikiNmDto =
+                            this.gyc08Dao.findKaishaSosikiNm(paramDto);
+//                    GYCKaishaSosikiNmDto gYCKaishaSosikiNmDto =
+//                            this.gYCIdoJohoDao.findKaishaSosikiNm(paramDto);
+                    if (gYCKaishaSosikiNmDto != null) {
+                        // 振分前ＤＴＯに設定
+                        if (gYCKaishaSosikiNmDto.getKaishaseishikiNm() != null) {
+                            gYC08IdoJohoHPDto.setKaishaNm(
+                                    gYCKaishaSosikiNmDto.getKaishaseishikiNm());
+                        }
+                        if (gYCKaishaSosikiNmDto.getSoshikiNm() != null) {
+                            gYC08IdoJohoHPDto
+                                    .setSosikiNm(gYCKaishaSosikiNmDto.getSoshikiNm());
+                        }
+                    }
+                }
+
+                break;
+
+
+            // 退職情報
+            case GYCIdoJohoConst.SBT_TAISHOKU:
+                // 退職情報処理クラスを使用して共通処理を行う。
+                idoDtoAbst = doIdoSbtCommProc(
+                        (GYC08IdoJohoFileProcAbst) gYCIdoJohoTaishokuJyhProc,
+                        gYC08IdoJohoCDto, gYC08IdoJohoHPDto);
+                if (idoDtoAbst == null || idoDtoAbst.isErrFlg()) {
+                    // エラーフラグを設定
+                    gYC08IdoJohoHPDto.setErrFlg(true);
+                }
+                break;
+
+
+            // 異動情報
+            case GYCIdoJohoConst.SBT_IDO:
+                // 異動情報処理クラスを使用して共通処理を行う。
+                idoDtoAbst =
+                        doIdoSbtCommProc((GYC08IdoJohoFileProcAbst) gYCIdoJohoIdoJyhProc,
+                                gYC08IdoJohoCDto, gYC08IdoJohoHPDto);
+                if (idoDtoAbst == null || idoDtoAbst.isErrFlg()) {
+                    // エラーフラグを設定
+                    gYC08IdoJohoHPDto.setErrFlg(true);
+                }
+                break;
+
+            // 出向情報
+            case GYCIdoJohoConst.SBT_SYUKKO:
+                // 出向情報処理クラスを使用して共通処理を行う。
+                idoDtoAbst =
+                        doIdoSbtCommProc((GYC08IdoJohoFileProcAbst) gYCIdoJohoSyukkoProc,
+                                gYC08IdoJohoCDto, gYC08IdoJohoHPDto);
+                if (idoDtoAbst == null || idoDtoAbst.isErrFlg()) {
+                    // エラーフラグを設定
+                    gYC08IdoJohoHPDto.setErrFlg(true);
+                }
+                // 出向元先設定処理
+                gYCIdoJohoSyukkoProc.syukkoMotoSakiJsyscd(gYC08IdoJohoHPDto, idoDtoAbst);
+
+                if (KoseiStringUtils.isEmpty(gYC08IdoJohoHPDto.getKaishaNm())) {
+                    String kaishaCd = "";
+                    String sosikiCd = "";
+                    // 出向情報
+                    GYCIdoJohoSyukkoDto gYCIdoJohoSyukkoDto =
+                            (GYCIdoJohoSyukkoDto) idoDtoAbst;
+                    if (!KoseiStringUtils.isEmpty(gYCIdoJohoSyukkoDto.getMotoJsysCd())) {
+                        kaishaCd = gYCIdoJohoSyukkoDto.getSyukkomotoKaishaCd();
+                        sosikiCd = gYCIdoJohoSyukkoDto.getSyukkomotoSoshikiCd();
+                    }
+                    if (!KoseiStringUtils.isEmpty(gYCIdoJohoSyukkoDto.getSakiJsysCd())) {
+                        kaishaCd = gYCIdoJohoSyukkoDto.getSyukkosakiKaishaCd();
+                        sosikiCd = gYCIdoJohoSyukkoDto.getSyukkosakiSoshikiCd();
+                    }
+
+                    // 会社名、組織名を取得する。
+                    GYC08KaishaSosikiNmDto paramDto = new GYC08KaishaSosikiNmDto();
+                    paramDto.setKaishaCd(kaishaCd);
+                    paramDto.setSoshikiCd(sosikiCd);
+                    paramDto.setGyomuHizuke(idoDtoAbst.getGymHizuke());
+                    GYC08KaishaSosikiNmDto gYC08KaishaSosikiNmDto =
+                            this.gyc08Dao.findKaishaSosikiNm(paramDto);
+                    if (gYC08KaishaSosikiNmDto != null) {
+                        // 振分前ＤＴＯに設定
+                        if (gYC08KaishaSosikiNmDto.getKaishaseishikiNm() != null) {
+                            gYC08IdoJohoHPDto.setKaishaNm(
+                                    gYC08KaishaSosikiNmDto.getKaishaseishikiNm());
+                        }
+                        if (gYC08KaishaSosikiNmDto.getSoshikiNm() != null) {
+                            gYC08IdoJohoHPDto
+                                    .setSosikiNm(gYC08KaishaSosikiNmDto.getSoshikiNm());
+                        }
+                    }
+                }
+
+                break;
+
+
+            // 休職情報
+            case GYCIdoJohoConst.SBT_KYUSYOKU:
+                // 異動情報処理クラスを使用して共通処理を行う。
+                idoDtoAbst = doIdoSbtCommProc(
+                        (GYC08IdoJohoFileProcAbst) gYCIdoJohoKyusyokuJyhProc,
+                        gYC08IdoJohoCDto, gYC08IdoJohoHPDto);
+                if (idoDtoAbst == null || idoDtoAbst.isErrFlg()) {
+                    // エラーフラグを設定
+                    gYC08IdoJohoHPDto.setErrFlg(true);
+                }
+                break;
+
+
+            // 転籍情報
+            case GYCIdoJohoConst.SBT_TENSEKI:
+                // 転籍情報処理クラスを使用して共通処理を行う。
+                idoDtoAbst = doIdoSbtCommProc(
+                        (GYC08IdoJohoFileProcAbst) gYCIdoJohoTensekiJyhProc,
+                        gYC08IdoJohoCDto, gYC08IdoJohoHPDto);
+                if (idoDtoAbst == null || idoDtoAbst.isErrFlg()) {
+                    // エラーフラグを設定
+                    gYC08IdoJohoHPDto.setErrFlg(true);
+                }
+                break;
+
+
+            default:
+                this.klogger.debug("  処理対象外の異動種別：{}", gYC08IdoJohoCDto.getIdoSbtCd());
+                // エラーフラグを設定
+                gYC08IdoJohoHPDto.setErrFlg(true);
+
+                // 異常を返却
+                return NG;
+
+        }
+
+
+
+        // 正常を返却
+        return OK;
+    }
+
+
+
+    /**
+     * <p>[概 要] doIdoSbtCommProc メソッド。</p>
+     * <p>[詳 細] 処理種別共通処理</p>
+     * <p>[備 考] </p>
+     *
+     * @param gYC08IdoJohoCDto 人事異動抽出情報
+     * @param idoJohoFileProc 人事異動情報抽象クラス
+     * @param gYC08IdoJohoHPDto 振分前DTO
+     * @return 処理結果
+     */
+    private GYCIdoJohoDtoAbst doIdoSbtCommProc(GYC08IdoJohoFileProcAbst idoJohoFileProc,
+            GYC08IdoJohoCDto gYC08IdoJohoCDto, GYC08IdoJohoHPDto gYC08IdoJohoHPDto) {
+
+        GYC08MessageId errCode;
+        GYCIdoJohoDtoAbst idoJohoDtoAbst = null;
+
+        // 各種異動情報を作成する。
+        try {
+
+            // 各種異動情報を作成する。
+            idoJohoDtoAbst = idoJohoFileProc.createIdoJohoDTO(gYC08IdoJohoCDto);
+
+            // その他の共通情報を設定
+            idoJohoDtoAbst.setFilegyoNo(gYC08IdoJohoCDto.getIdofilegyoNo());
+            idoJohoDtoAbst.setNameCd(gYC08IdoJohoCDto.getNameCd());
+            idoJohoDtoAbst.setGymHizuke(gYC08IdoJohoHPDto.getGymHizuke());
+
+
+
+        } catch (IdoJohohException ex) {
+            // エラー処理を実行
+            GYC08MessageId rtnMessage = GYC08MessageId.GYC08E058;
+            String message =
+                    MessageFormat.format(this.messageAccessor.getText(rtnMessage),
+                            gYC08IdoJohoCDto.getNameCd());
+            this.klogger.debug("IdoJohohException :{}", ex.getMessage());
+            // エラー処理を実行
+            GYCIdoJohoMsgWDto msgWDto =
+                    new GYCIdoJohoMsgWDto(rtnMessage.toString(), message);
+            doIdoJohoErrOut(gYC08IdoJohoCDto, msgWDto);
+            // エラー件数を加算
+            gYC08IdoJohoHPDto.setErrorCnt(gYC08IdoJohoHPDto.getErrorCnt() + 1);
+
+            // 生成に失敗したので、Nullで返却
+            return null;
+
+        }
+
+
+
+        // バリデーションチェック実施
+        // String message = idoJohoFileProc.validate(idoJohoDtoAbst);
+        // if(message != null) {
+        // //エラー処理を実行
+        // GYCIdoJohoMsgWDto msgWDto = new GYCIdoJohoMsgWDto("GYC08E000", message);
+        // doIdoJohoErrOut(gYC08IdoJohoCDto, msgWDto);
+        // //異動情報にエラーフラグを設定
+        // idoJohoDtoAbst.setErrFlg(true);
+        // return idoJohoDtoAbst;
+        // }
+
+        // 人事異動情報振分妥当性チェック
+        errCode = idoJohoFileProc.furiwakeValidate(idoJohoDtoAbst);
+        if (!GYC08MessageId.GYC08I000.equals(errCode)) {
+
+            if (GYC08MessageId.GYC08W001.equals(errCode)) {
+                // 返却値がワーニングだった場合は警告出力処理を行い、次処理続行
+                doOutputWarningMsg(gYC08IdoJohoCDto, errCode);
+            } else {
+                // エラー処理を実行
+                GYCIdoJohoMsgWDto msgWDto = new GYCIdoJohoMsgWDto(errCode.toString(),
+                        idoJohoDtoAbst.getErrMsg());
+                doIdoJohoErrOut(gYC08IdoJohoCDto, msgWDto);
+                // 異動情報にエラーフラグを設定
+                idoJohoDtoAbst.setErrFlg(true);
+                // エラー件数を加算
+                gYC08IdoJohoHPDto.setErrorCnt(gYC08IdoJohoHPDto.getErrorCnt() + 1);
+
+                return idoJohoDtoAbst;
+            }
+        }
+
+        // コード変換処理を行う。
+        errCode = idoJohoFileProc.codeChg(idoJohoDtoAbst, jsysCodeChgMap,
+                gYC08IdoJohoHPDto.getKaishaChgMap(), sihKbnMap);
+        if (!GYC08MessageId.GYC08I000.equals(errCode)) {
+            // エラー処理を実行
+            GYCIdoJohoMsgWDto msgWDto =
+                    new GYCIdoJohoMsgWDto(errCode.toString(), idoJohoDtoAbst.getErrMsg());
+            doIdoJohoErrOut(gYC08IdoJohoCDto, msgWDto);
+            // 異動情報にエラーフラグを設定
+            idoJohoDtoAbst.setErrFlg(true);
+            // エラー件数を加算
+            gYC08IdoJohoHPDto.setErrorCnt(gYC08IdoJohoHPDto.getErrorCnt() + 1);
+
+            return idoJohoDtoAbst;
+        }
+
+
+        // 変換前DTOに作成した異動情報を登録する。
+        idoJohoFileProc.henkanDtoListAdd(gYC08IdoJohoHPDto, idoJohoDtoAbst);
+
+        // 変換前DTOに警告情報を登録する。
+        idoJohoFileProc.warnListAdd(gYC08IdoJohoHPDto, idoJohoDtoAbst);
+
+
+
+        return idoJohoDtoAbst;
+    }
+
+
+
+    /**
+     * <p>[概 要] doIdoJohoChkToroku メソッド。</p>
+     * <p>[詳 細] 異動情報チェック＆登録処理</p>
+     * <p>[備 考] </p>
+     *
+     * @param gYC08IdoJohoHPDto 振分前ＤＴＯ
+     */
+    private void doIdoJohoChkToroku(GYC08IdoJohoHPDto gYC08IdoJohoHPDto) {
+
+        // 各処理結果コード
+        int rtnCode = 0;
+
+        // 人事異動情報振分済みワークテーブル
+        GYCIdoJohoHDto paramDto = new GYCIdoJohoHDto();
+        paramDto.setIdohasseinengappi(gYC08IdoJohoHPDto.getIdohasseinengappi());
+        paramDto.setNameCd(gYC08IdoJohoHPDto.getNameCd());
+        // 人事異動情報振分済みワークテーブル
+        GYCIdoJohoHDto gYCIdoJohoHDto = null;
+        // データ存在フラグ
+        boolean exsistFlg = false;
+
+        // 該当レコードがあれば、取得
+        gYCIdoJohoHDto = this.gyc08Dao.findIdoJohoHByPk(paramDto);
+        if (gYCIdoJohoHDto == null) {
+            gYCIdoJohoHDto = new GYCIdoJohoHDto();
+        } else {
+            // データ存在
+            exsistFlg = true;
+        }
+
+        gYCIdoJohoHDto.setIdohasseinengappi(gYC08IdoJohoHPDto.getIdohasseinengappi());
+        gYCIdoJohoHDto.setNameCd(gYC08IdoJohoHPDto.getNameCd());
+
+        // 登録済フラグ（未登録で登録）
+        gYCIdoJohoHDto.setTorokusumiFlg("0");
+        gYCIdoJohoHDto.setCreateUserId(gYC08IdoJohoHPDto.getCreateUserId());
+        gYCIdoJohoHDto.setLastUpdateUserId(gYC08IdoJohoHPDto.getLastUpdateUserId());
+
+
+        // 人事異動情報のチェック
+        rtnCode = doIdoJohoHCheck(gYC08IdoJohoHPDto, gYCIdoJohoHDto);
+        if (rtnCode == OK) {
+            // 人事異動情報登録処理
+            doIdoJohoToroku(gYC08IdoJohoHPDto, gYCIdoJohoHDto, exsistFlg);
+
+        }
+    }
+
+
+
+    /**
+     * <p>[概 要] doIdoJohoHCheck メソッド。</p>
+     * <p>[詳 細] 異動情報振分チェック処理</p>
+     * <p>[備 考] </p>
+     *
+     * @param gYC08IdoJohoHPDto 振分前ＤＴＯ
+     * @param gYCIdoJohoHDto 事異動情報振分済みDTO
+     * @return 処理結果
+     */
+    private int doIdoJohoHCheck(GYC08IdoJohoHPDto gYC08IdoJohoHPDto,
+            GYCIdoJohoHDto gYCIdoJohoHDto) {
+
+        // ログ出力
+        this.klogger.debug("【 チェック開始 】 社員氏名コード:{} 異動発生年月日: {} 対象件数:{} ------>",
+                gYC08IdoJohoHPDto.getNameCd(), gYC08IdoJohoHPDto.getIdohasseinengappi(),
+                gYC08IdoJohoHPDto.getLstGYC08IdoJohoCDto().size());
+
+        GYC08MessageId rtnMessage = null;
+
+        // エラーフラグチェック
+        if (gYC08IdoJohoHPDto.isErrFlg()) {
+
+            // 今のエラー件数を取得
+            int errorCnt = gYC08IdoJohoHPDto.getErrorCnt();
+            Iterator<GYC08IdoJohoCDto> itr =
+                    gYC08IdoJohoHPDto.getLstGYC08IdoJohoCDto().iterator();
+            while (itr.hasNext()) {
+
+                // 抽出データを取得
+                GYC08IdoJohoCDto dto = (GYC08IdoJohoCDto) itr.next();
+                // 有効データであるにもかかわらず、巻き添えでエラーとなるデータを出力
+                if (YUKO.equals(dto.getYukoRecFlg())) {
+                    rtnMessage = GYC08MessageId.GYC08E057;
+                    // エラーメッセージ
+                    String message =
+                            MessageFormat.format(this.messageAccessor.getText(rtnMessage),
+                                    gYC08IdoJohoHPDto.getNameCd());
+                    // エラー処理を実行
+                    GYCIdoJohoMsgWDto msgWDto =
+                            new GYCIdoJohoMsgWDto(rtnMessage.toString(), message);
+                    doIdoJohoErrOut(dto, msgWDto);
+
+                    errorCnt++;
+
+                }
+
+            }
+            gYC08IdoJohoHPDto.setErrorCnt(errorCnt);
+
+
+            // ログ出力
+            this.klogger.debug("【 チェック結果 】 エラー（無効データ含む）ありのため、登録処理なし。");
+            return NG;
+        }
+
+
+
+        // 以下、出向情報から判別され、その他の箇所で使用するための退避情報
+        String syukkoHukkiKbn = "";
+        String motoJsysCd = "";
+        String sakiJsysCd = "";
+        String syukkoSbtCd = "";
+        GYCIdoJohoSyukkoDto rec1Dto = new GYCIdoJohoSyukkoDto();
+        GYCIdoJohoSyukkoDto rec2Dto = new GYCIdoJohoSyukkoDto();
+
+        // ※ただし、連携された値が35～38の時、異動コードに860:死亡が設定されている場合があり、
+        // この場合は厚生系としては01:死亡（退職年月日としても使用）として取り込みを行う のためのフラグ
+        boolean siboFlg = false;
+
+
+
+        // 出向情報の値をチェックする。
+        if (gYC08IdoJohoHPDto.getLstGYCIdoJohoSyukkoDto().size() >= 1) {
+
+            int addCnt = 0;
+            int delCnt = 0;
+            boolean kaisiFlg = false;
+            boolean hukkiFlg = false;
+
+            GYCIdoJohoSyukkoDto dto = new GYCIdoJohoSyukkoDto();
+            Iterator<GYCIdoJohoSyukkoDto> itr =
+                    gYC08IdoJohoHPDto.getLstGYCIdoJohoSyukkoDto().iterator();
+            while (itr.hasNext()) {
+                // 人事異動 出向開始を取得する。
+                dto = (GYCIdoJohoSyukkoDto) itr.next();
+
+                // 出向開始と復帰の混在判定
+                if (GYCIdoJohoConst.SYUKKO_KAISHI.equals(dto.getSyukkoHukkiKbn())) {
+                    kaisiFlg = true;
+                } else {
+                    hukkiFlg = true;
+                }
+
+                // 処理種別ごとの件数を算出
+                if (GYCIdoJohoConst.SHORISBT_ADD.equals(dto.getShoriSbtHyoji())) {
+                    addCnt++;
+                } else {
+                    delCnt++;
+                }
+
+                if (addCnt == 1) {
+                    this.mapper.map(dto, rec1Dto);
+                } else if (addCnt == 2) {
+                    this.mapper.map(dto, rec2Dto);
+                }
+
+            }
+            // 出向復帰区分を退避
+            syukkoHukkiKbn = dto.getSyukkoHukkiKbn();
+            // 出向種別を退避
+            syukkoSbtCd = dto.getSyukkoSbt();
+
+
+            if (addCnt > 2) {
+                rtnMessage = GYC08MessageId.GYC08E047;
+                String message =
+                        MessageFormat.format(this.messageAccessor.getText(rtnMessage),
+                                gYC08IdoJohoHPDto.getNameCd());
+                // エラー処理を実行
+                GYCIdoJohoMsgWDto msgWDto =
+                        new GYCIdoJohoMsgWDto(rtnMessage.toString(), message);
+                doIdoJohoErrOut2(gYC08IdoJohoHPDto, msgWDto);
+                // 異常を返却
+                return NG;
+            }
+            if (delCnt > 0) {
+                rtnMessage = GYC08MessageId.GYC08E049;
+                String message =
+                        MessageFormat.format(this.messageAccessor.getText(rtnMessage),
+                                gYC08IdoJohoHPDto.getNameCd());
+                // エラー処理を実行
+                GYCIdoJohoMsgWDto msgWDto =
+                        new GYCIdoJohoMsgWDto(rtnMessage.toString(), message);
+                doIdoJohoErrOut2(gYC08IdoJohoHPDto, msgWDto);
+                // 異常を返却
+                return NG;
+            }
+
+            if (kaisiFlg && hukkiFlg) {
+                // 出向開始と出向復帰が同じ異動発生日はエラー
+                rtnMessage = GYC08MessageId.GYC08E051;
+                String message =
+                        MessageFormat.format(this.messageAccessor.getText(rtnMessage),
+                                gYC08IdoJohoHPDto.getNameCd());
+                // エラー処理を実行
+                GYCIdoJohoMsgWDto msgWDto =
+                        new GYCIdoJohoMsgWDto(rtnMessage.toString(), message);
+                doIdoJohoErrOut2(gYC08IdoJohoHPDto, msgWDto);
+                // 異常を返却
+                return NG;
+
+            }
+            // 同一人給からの出向情報は組み合わせエラーとする。
+            if (addCnt == 2) {
+                if (rec1Dto.getJsysSbtCd().equals(rec2Dto.getJsysSbtCd())) {
+                    rtnMessage = GYC08MessageId.GYC08E054;
+                    String message =
+                            MessageFormat.format(this.messageAccessor.getText(rtnMessage),
+                                    gYC08IdoJohoHPDto.getNameCd());
+                    // エラー処理を実行
+                    GYCIdoJohoMsgWDto msgWDto =
+                            new GYCIdoJohoMsgWDto(rtnMessage.toString(), message);
+                    doIdoJohoErrOut2(gYC08IdoJohoHPDto, msgWDto);
+                    // 異常を返却
+                    return NG;
+                }
+            }
+
+            // 出向開始の場合
+            if (kaisiFlg) {
+
+                if (addCnt == 1) {
+                    motoJsysCd = rec1Dto.getMotoJsysCd();
+                    sakiJsysCd = rec1Dto.getSakiJsysCd();
+                } else {
+
+                    if (!KoseiStringUtils.isEmpty(rec1Dto.getMotoJsysCd())) {
+                        motoJsysCd = rec1Dto.getMotoJsysCd();
+                    }
+                    if (!KoseiStringUtils.isEmpty(rec1Dto.getSakiJsysCd())) {
+                        sakiJsysCd = rec1Dto.getSakiJsysCd();
+                    }
+                    if (!KoseiStringUtils.isEmpty(rec2Dto.getMotoJsysCd())) {
+                        motoJsysCd = rec2Dto.getMotoJsysCd();
+                    }
+                    if (!KoseiStringUtils.isEmpty(rec2Dto.getSakiJsysCd())) {
+                        sakiJsysCd = rec2Dto.getSakiJsysCd();
+                    }
+                }
+
+                this.klogger.debug("    出向開始 出向元：{}、出向先{}", motoJsysCd, sakiJsysCd);
+
+
+            }
+
+
+
+            // 出向復帰の場合
+            if (hukkiFlg) {
+
+                // 出向復帰の場合は、出向しているので、社員情報テーブルの出向先会社コードと出向元会社コードを取得し、
+                // 人給システムコードが一致することにより、元先判定をおこなう。
+                GYC08ShainKaishaJsysCdDto shainJsysDto = this.gyc08Dao
+                        .findShainKaishaJsysCd(gYC08IdoJohoHPDto.getNameCd(), gYC08IdoJohoHPDto.getGymHizuke());
+                if (shainJsysDto == null) {
+                    // 出向中なのにＤＢに社員情報が存在しない。
+                    rtnMessage = GYC08MessageId.GYC08E053;
+                    String message =
+                            MessageFormat.format(this.messageAccessor.getText(rtnMessage),
+                                    gYC08IdoJohoHPDto.getNameCd());
+                    // エラー処理を実行
+                    GYCIdoJohoMsgWDto msgWDto =
+                            new GYCIdoJohoMsgWDto(rtnMessage.toString(), message);
+                    doIdoJohoErrOut2(gYC08IdoJohoHPDto, msgWDto);
+                    // 異常を返却
+                    return NG;
+                }
+                // 出向元会社の人給システムコードを設定
+                if (shainJsysDto.getSyukkomotoJsysCd() != null) {
+                    String jsysCd = shainJsysDto.getSyukkomotoJsysCd();
+                    if (!(GYCIdoJohoConst.JSYS_INFOGRID.equals(jsysCd)
+                            || GYCIdoJohoConst.JSYS_SPEAD.equals(jsysCd)
+                            || GYCIdoJohoConst.JSYS_COMS.equals(jsysCd))) {
+                        // ３人給で無い場合はその他人給として扱う。
+                        jsysCd = GYCIdoJohoConst.JSYS_SONOTA;
+                    }
+                    motoJsysCd = jsysCd;
+                }
+                // 出向先会社の人給システムコードを設定
+                if (shainJsysDto.getSyukkosakiJsysCd() != null) {
+                    String jsysCd = shainJsysDto.getSyukkosakiJsysCd();
+                    if (!(GYCIdoJohoConst.JSYS_INFOGRID.equals(jsysCd)
+                            || GYCIdoJohoConst.JSYS_SPEAD.equals(jsysCd)
+                            || GYCIdoJohoConst.JSYS_COMS.equals(jsysCd))) {
+                        // ３人給で無い場合はその他人給として扱う。
+                        jsysCd = GYCIdoJohoConst.JSYS_SONOTA;
+                    }
+                    sakiJsysCd = jsysCd;
+                }
+
+                this.klogger.debug("    出向復帰 出向元：{}、出向先{}", motoJsysCd, sakiJsysCd);
+
+            }
+        }
+
+        // 社員情報
+        if (gYC08IdoJohoHPDto.getLstGYCIdoJohoSinJyhDto().size() >= 1) {
+
+            this.klogger.debug("    社員情報リスト件数：{}",
+                    gYC08IdoJohoHPDto.getLstGYCIdoJohoSinJyhDto().size());
+
+            // 組み合わせチェックパラメータ
+            int sinkiCnt = 0;
+            int isekiCnt = 0;
+            int saisaiCnt = 0;
+            int sonotaCnt = 0;
+
+            int addCnt = 0;
+            int delCnt = 0;
+            // 複数データ（出向元、出向先）から振分済みデータを作成する。
+            GYCIdoJohoSinJyhDto rec1SinDto = new GYCIdoJohoSinJyhDto();
+            GYCIdoJohoSinJyhDto rec2SinDto = new GYCIdoJohoSinJyhDto();
+
+
+
+            Iterator<GYCIdoJohoSinJyhDto> itr =
+                    gYC08IdoJohoHPDto.getLstGYCIdoJohoSinJyhDto().iterator();
+            while (itr.hasNext()) {
+                // 人事異動 社員情報を取得する。
+                GYCIdoJohoSinJyhDto dto = (GYCIdoJohoSinJyhDto) itr.next();
+
+
+
+                // 処理種別ごとの件数を算出
+                if (GYCIdoJohoConst.SHORISBT_ADD.equals(dto.getSShoriSbtHyoji())) {
+                    addCnt++;
+
+                    String sinsaiKbn = dto.getSSinsaiSaisaiyoKbnCd();
+
+                    // COM人給の場合、発令を伴わない社員情報の変更の場合、新採・再採用区分コード
+                    // が前回の値できてしまう対応。
+                    if (GYCIdoJohoConst.JSYS_COMS.equals(dto.getSJsysSbtCd()) || 
+                            GYCIdoJohoConst.JSYS_SPEAD.equals(dto.getSJsysSbtCd())) {
+                        sinsaiKbn = comsSinsaiSaiyoKbnChk(sinsaiKbn,
+                                gYCIdoJohoHDto.getNameCd());
+                    }
+
+                    // 新採・再採用区分コードの存在チェック
+                    switch (sinsaiKbn) {
+                        case GYCIdoJohoConst.SHINSAI_SAIYO:
+                            sinkiCnt++;
+                            break;
+                        case GYCIdoJohoConst.SHINSAI_ISEKI:
+                            isekiCnt++;
+                            break;
+                        case GYCIdoJohoConst.SHINSAI_SAISAIYO:
+                            saisaiCnt++;
+                            break;
+                        case " ":
+                            sonotaCnt++;
+                            break;
+                        default:
+                            // 新採・再採用区分コードチェック済みのはず。
+                            this.klogger.error("    新採・再採用区分コード 不正　新採・再採用区分コード：{}",
+                                    dto.getSSinsaiSaisaiyoKbnCd());
+                            break;
+                    }
+
+                } else {
+                    delCnt++;
+                }
+
+                if (addCnt == 1 || delCnt == 1) {
+                    this.mapper.map(dto, rec1SinDto);
+                } else if (addCnt == 2) {
+                    this.mapper.map(dto, rec2SinDto);
+                }
+
+                // SPEADかつ異動要因コードが死亡（860）の場合、フラグを設定
+                if (GYCIdoJohoConst.JSYS_SPEAD.equals(dto.getSJsysSbtCd())
+                        && SPEAD_IDO_CD_SIBO.equals(dto.getsIdoCdBak())) {
+                    siboFlg = true;
+                }
+
+            }
+
+            // 異動情報内の組み合わせチェック
+            if (addCnt > 2) {
+                rtnMessage = GYC08MessageId.GYC08E047;
+                String message =
+                        MessageFormat.format(this.messageAccessor.getText(rtnMessage),
+                                gYC08IdoJohoHPDto.getNameCd());
+                // エラー処理を実行
+                GYCIdoJohoMsgWDto msgWDto =
+                        new GYCIdoJohoMsgWDto(rtnMessage.toString(), message);
+                doIdoJohoErrOut2(gYC08IdoJohoHPDto, msgWDto);
+                // 異常を返却
+                return NG;
+            }
+            if (delCnt > 1) {
+                rtnMessage = GYC08MessageId.GYC08E048;
+                String message =
+                        MessageFormat.format(this.messageAccessor.getText(rtnMessage),
+                                gYC08IdoJohoHPDto.getNameCd());
+                // エラー処理を実行
+                GYCIdoJohoMsgWDto msgWDto =
+                        new GYCIdoJohoMsgWDto(rtnMessage.toString(), message);
+                doIdoJohoErrOut2(gYC08IdoJohoHPDto, msgWDto);
+                // 異常を返却
+                return NG;
+            }
+            if (addCnt > 0 && delCnt > 0) {
+                rtnMessage = GYC08MessageId.GYC08E050;
+                String message =
+                        MessageFormat.format(this.messageAccessor.getText(rtnMessage),
+                                gYC08IdoJohoHPDto.getNameCd());
+                // エラー処理を実行
+                GYCIdoJohoMsgWDto msgWDto =
+                        new GYCIdoJohoMsgWDto(rtnMessage.toString(), message);
+                doIdoJohoErrOut2(gYC08IdoJohoHPDto, msgWDto);
+                // 異常を返却
+                return NG;
+            }
+            // その他以外は重複の組み合わせは無効
+            if (sinkiCnt == 2 || isekiCnt == 2 || saisaiCnt == 2 || (sonotaCnt == 2
+                    && gYC08IdoJohoHPDto.getLstGYCIdoJohoSyukkoDto().size() == 0)) {
+                rtnMessage = GYC08MessageId.GYC08E054;
+                String message =
+                        MessageFormat.format(this.messageAccessor.getText(rtnMessage),
+                                gYC08IdoJohoHPDto.getNameCd());
+                // エラー処理を実行
+                GYCIdoJohoMsgWDto msgWDto =
+                        new GYCIdoJohoMsgWDto(rtnMessage.toString(), message);
+                doIdoJohoErrOut2(gYC08IdoJohoHPDto, msgWDto);
+                // 異常を返却
+                return NG;
+            }
+
+
+            // 振分済DTO設定処理
+            if (gYC08IdoJohoHPDto.getLstGYCIdoJohoSyukkoDto().size() == 0) {
+                // 出向情報が存在しない場合
+                this.mapper.map(rec1SinDto, gYCIdoJohoHDto);
+
+            } else {
+
+                // 出向情報が存在する場合
+                //////////////////////////////////////////////////////////
+                // 出向情報と社員情報のパターン
+                //////////////////////////////////////////////////////////
+                // 出向情報 社員情報
+                // 出元 出先 出元 出先 結果
+                // (1 ) ○ ○ ○ ○ OK ４レコードパターン
+                // (2 ) ○ ○ ○ － OK メジャールート
+                // (3 ) ○ ○ － ○ OK メジャールートのうら
+                // (4 ) ○ ○ － － OK 出向情報のみ（運用上はない） 社員情報なしなので、ここでは関係なし。
+                // (5 ) ○ － ○ － OK 出向先がおくれてこなかった。
+                // (6 ) ○ － － ○ NG 出向情報と社員情報の人給システムコードと一致しない
+                // (7 ) ○ － ○ ○ NG 社員情報が２件あるのに出向情報が２件でない場合はNG
+                // (8 ) － ○ － ○ OK 出向元がおくれてこなかった。
+                // (9 ) － ○ ○ － NG 出向情報と社員情報の人給システムコードと一致しない
+                // (10) － ○ ○ ○ NG 社員情報が２件あるのに出向情報が２件でない場合はNG
+                // (11) － － ○ ○ NG 社員情報が２件あるのに出向情報が無い場合はNG
+
+                boolean dataSetErrFlg = false;
+
+                // 社員情報を振分済ＤＴＯの設定処理
+                if (addCnt == 1) {
+                    // 2016/09/23 Update by Matsui 出向元優先に変更
+                    // 社員情報を振分済ＤＴＯに設定する。
+                    // this.mapper.map(rec1SinDto, gYCIdoJohoHDto);
+
+                    // 出向情報の人事システムコードと一致したものを出向元・先とする。
+                    if (!KoseiStringUtils.isEmpty(motoJsysCd)
+                            && !KoseiStringUtils.isEmpty(sakiJsysCd)) {
+                        if (motoJsysCd.equals(rec1SinDto.getSJsysSbtCd())) {
+                            if (sakiJsysCd.equals(rec1SinDto.getSJsysSbtCd())) {
+                                // 同一人給内の異動(出向元、出向先が一致） (2)、(3) 同一人給の異動
+                                setShainJoho(gYCIdoJohoHDto, syukkoSbtCd, rec1SinDto,
+                                        rec1SinDto);
+                            } else {
+                                // 出向元の社員情報しかない。 (2)
+                                setShainJoho(gYCIdoJohoHDto, syukkoSbtCd, rec1SinDto,
+                                        null);
+                            }
+                        } else if (sakiJsysCd.equals(rec1SinDto.getSJsysSbtCd())) {
+                            // 出向先の社員情報しかない。 (3)
+                            setShainJoho(gYCIdoJohoHDto, syukkoSbtCd, null, rec1SinDto);
+                        }
+                    } else if (!KoseiStringUtils.isEmpty(motoJsysCd)) {
+                        if (motoJsysCd.equals(rec1SinDto.getSJsysSbtCd())) {
+                            // 利用外への出向で出向元の社員情報しかない。(5)
+                            setShainJoho(gYCIdoJohoHDto, syukkoSbtCd, rec1SinDto, null);
+
+                        } else {
+                            // 出向情報は出向元だが、一致する人給システムの社員情報ではない。(6)
+                            dataSetErrFlg = true;
+                        }
+                    } else if (!KoseiStringUtils.isEmpty(sakiJsysCd)) {
+                        if (sakiJsysCd.equals(rec1SinDto.getSJsysSbtCd())) {
+                            // 利用外への出向で出向先の社員情報しかない。 (8)
+                            setShainJoho(gYCIdoJohoHDto, syukkoSbtCd, null, rec1SinDto);
+
+                        } else {
+                            // 出向情報は出向先だが、一致する人給システムの社員情報ではない。 (9)
+                            dataSetErrFlg = true;
+                        }
+                    }
+                } else if (addCnt == 2) {
+                    // 2016/09/23 Update by Matsui 出向元優先に変更
+                    // 後勝ちで社員情報を振分済ＤＴＯに初期設定する。
+                    // this.mapper.map(rec2SinDto, gYCIdoJohoHDto);
+
+                    // 出向情報の人事システムコードと一致したものを出向元・先とする。
+                    if (!KoseiStringUtils.isEmpty(motoJsysCd)
+                            && !KoseiStringUtils.isEmpty(sakiJsysCd)) {
+                        if (motoJsysCd.equals(rec1SinDto.getSJsysSbtCd())) {
+                            if (sakiJsysCd.equals(rec2SinDto.getSJsysSbtCd())) {
+                                // 同一人給内の異動(出向元、出向先が一致） (1)
+                                setShainJoho(gYCIdoJohoHDto, syukkoSbtCd, rec1SinDto,
+                                        rec2SinDto);
+                            } else {
+                                // 出向先の社員情報が一致しない。
+                                dataSetErrFlg = true;
+                            }
+                        } else if (motoJsysCd.equals(rec2SinDto.getSJsysSbtCd())) {
+                            if (sakiJsysCd.equals(rec1SinDto.getSJsysSbtCd())) {
+                                // 同一人給内の異動(出向元、出向先が一致） (1)
+                                setShainJoho(gYCIdoJohoHDto, syukkoSbtCd, rec2SinDto,
+                                        rec1SinDto);
+                            } else {
+                                // 出向先の社員情報が一致しない。
+                                dataSetErrFlg = true;
+                            }
+                        }
+                    } else {
+                        // (7)、(10)、(11)
+                        dataSetErrFlg = true;
+                    }
+                } else {
+                    // おまじない
+                    dataSetErrFlg = true;
+                }
+
+                // 出向情報と社員情報の状態が不正
+                if (dataSetErrFlg) {
+                    rtnMessage = GYC08MessageId.GYC08E052;
+                    String message =
+                            MessageFormat.format(this.messageAccessor.getText(rtnMessage),
+                                    gYC08IdoJohoHPDto.getNameCd());
+                    // エラー処理を実行
+                    GYCIdoJohoMsgWDto msgWDto =
+                            new GYCIdoJohoMsgWDto(rtnMessage.toString(), message);
+                    doIdoJohoErrOut2(gYC08IdoJohoHPDto, msgWDto);
+                    // 異常を返却
+                    return NG;
+
+                }
+            }
+
+            if (delCnt == 1) {
+                // 削除のデータを設定する。
+                this.mapper.map(rec1SinDto, gYCIdoJohoHDto);
+            }
+
+        }
+
+        // 退職情報
+        if (gYC08IdoJohoHPDto.getLstGYCIdoJohoTaishokuJyhDto().size() >= 1) {
+
+            // int addCnt = 0;
+            int delCnt = 0;
+            GYCIdoJohoTaishokuJyhDto dto = null;
+            Iterator<GYCIdoJohoTaishokuJyhDto> itr =
+                    gYC08IdoJohoHPDto.getLstGYCIdoJohoTaishokuJyhDto().iterator();
+            while (itr.hasNext()) {
+                // 人事異動 退職情報を取得する。
+                dto = (GYCIdoJohoTaishokuJyhDto) itr.next();
+
+                // 処理種別ごとの件数を算出
+                if (GYCIdoJohoConst.SHORISBT_ADD.equals(dto.getTiShoriSbtHyoji())) {
+                    // 重複可
+                    // addCnt ++;
+                } else {
+                    delCnt++;
+                }
+
+            }
+
+            // 退職情報は重複OK。同一のデータを想定し、後勝ちで処理。
+            if (delCnt > 0) {
+                rtnMessage = GYC08MessageId.GYC08E049;
+                String message =
+                        MessageFormat.format(this.messageAccessor.getText(rtnMessage),
+                                gYC08IdoJohoHPDto.getNameCd());
+                // エラー処理を実行
+                GYCIdoJohoMsgWDto msgWDto =
+                        new GYCIdoJohoMsgWDto(rtnMessage.toString(), message);
+                doIdoJohoErrOut2(gYC08IdoJohoHPDto, msgWDto);
+                // 異常を返却
+                return NG;
+            }
+
+            // あるはずだけど、警告が出ているのでNullチェック
+            if (dto != null) {
+                // SPEADかつ死亡フラグがTrueの場合
+                if (GYCIdoJohoConst.JSYS_SPEAD.equals(dto.getTiJsysSbtCd()) && siboFlg) {
+                    // 退職事由コードが35～38の場合は退職事由コードに死亡を設定する。
+                    if (SPEAD_TAIJI_CD_SIBO1.equals(dto.getTaishokujiyuCdBak())
+                            || SPEAD_TAIJI_CD_SIBO2.equals(dto.getTaishokujiyuCdBak())
+                            || SPEAD_TAIJI_CD_SIBO3.equals(dto.getTaishokujiyuCdBak())
+                            || SPEAD_TAIJI_CD_SIBO4.equals(dto.getTaishokujiyuCdBak())) {
+                        // 死亡を設定
+                        dto.setTiTaishokujiyuCd(GYCIdoJohoConst.TAISHOKU_RIYU_SHIBO);
+                    }
+                }
+
+                // 退職情報の設定
+                this.mapper.map(dto, gYCIdoJohoHDto);
+            }
+
+
+        }
+
+        // 異動情報
+        if (gYC08IdoJohoHPDto.getLstGYCIdoJohoIdoJyhDto().size() >= 1) {
+
+            int addCnt = 0;
+            int delCnt = 0;
+            GYCIdoJohoIdoJyhDto dto = null;
+            Iterator<GYCIdoJohoIdoJyhDto> itr =
+                    gYC08IdoJohoHPDto.getLstGYCIdoJohoIdoJyhDto().iterator();
+            while (itr.hasNext()) {
+                // 人事異動 異動情報を取得する。
+                dto = (GYCIdoJohoIdoJyhDto) itr.next();
+
+                // 処理種別ごとの件数を算出
+                if (GYCIdoJohoConst.SHORISBT_ADD.equals(dto.getIShoriSbtHyoji())) {
+                    addCnt++;
+                } else {
+                    delCnt++;
+                }
+            }
+            if (addCnt > 1) {
+                rtnMessage = GYC08MessageId.GYC08E046;
+                String message =
+                        MessageFormat.format(this.messageAccessor.getText(rtnMessage),
+                                gYC08IdoJohoHPDto.getNameCd());
+                // エラー処理を実行
+                GYCIdoJohoMsgWDto msgWDto =
+                        new GYCIdoJohoMsgWDto(rtnMessage.toString(), message);
+                doIdoJohoErrOut2(gYC08IdoJohoHPDto, msgWDto);
+                // 異常を返却
+                return NG;
+            }
+            if (delCnt > 0) {
+                rtnMessage = GYC08MessageId.GYC08E049;
+                String message =
+                        MessageFormat.format(this.messageAccessor.getText(rtnMessage),
+                                gYC08IdoJohoHPDto.getNameCd());
+                // エラー処理を実行
+                GYCIdoJohoMsgWDto msgWDto =
+                        new GYCIdoJohoMsgWDto(rtnMessage.toString(), message);
+                doIdoJohoErrOut2(gYC08IdoJohoHPDto, msgWDto);
+                // 異常を返却
+                return NG;
+            }
+
+            // 異動情報の設定
+            this.mapper.map(dto, gYCIdoJohoHDto);
+
+        }
+
+        // 出向情報の更新処理
+        if (gYC08IdoJohoHPDto.getLstGYCIdoJohoSyukkoDto().size() >= 1) {
+
+
+            boolean dataSetErrFlg = false;
+
+            // １件の場合
+            if (gYC08IdoJohoHPDto.getLstGYCIdoJohoSyukkoDto().size() == 1) {
+
+                // 2016/09/23 Update by Matsui 出向元優先に変更
+                // 出向情報の共通部を設定
+                // setSyukkoJohoComon(gYCIdoJohoHDto,syukkoHukkiKbn, rec1Dto);
+
+                // 出向開始の場合
+                if (GYCIdoJohoConst.SYUKKO_KAISHI.equals(syukkoHukkiKbn)) {
+                    if (KoseiStringUtils.isEmpty(sakiJsysCd)
+                            && !KoseiStringUtils.isEmpty(motoJsysCd)) {
+                        // 出向元のみ判明
+                        setSyukkoJoho(gYCIdoJohoHDto, syukkoHukkiKbn, rec1Dto, null);
+
+                    } else if (!KoseiStringUtils.isEmpty(sakiJsysCd)
+                            && KoseiStringUtils.isEmpty(motoJsysCd)) {
+                        // 出向先のみ判明
+                        setSyukkoJoho(gYCIdoJohoHDto, syukkoHukkiKbn, null, rec1Dto);
+
+                    } else if (!KoseiStringUtils.isEmpty(sakiJsysCd)
+                            && !KoseiStringUtils.isEmpty(motoJsysCd)) {
+                        // 出向元・先判明
+                        setSyukkoJoho(gYCIdoJohoHDto, syukkoHukkiKbn, rec1Dto, rec1Dto);
+                    } else {
+                        dataSetErrFlg = true;
+                    }
+                } else {
+                    // 出向復帰（DBから元先の人事システムコードは判定している）
+                    if (motoJsysCd.equals(rec1Dto.getJsysSbtCd())) {
+                        if (sakiJsysCd.equals(rec1Dto.getJsysSbtCd())) {
+                            // 同一人給内の異動(出向元、出向先が一致） (2)、(3) 同一人給の異動
+                            setSyukkoJoho(gYCIdoJohoHDto, syukkoHukkiKbn, rec1Dto,
+                                    rec1Dto);
+                        } else {
+                            // 出向元の出向情報しかない。
+                            setSyukkoJoho(gYCIdoJohoHDto, syukkoHukkiKbn, rec1Dto, null);
+                        }
+                    } else if (sakiJsysCd.equals(rec1Dto.getJsysSbtCd())) {
+                        // 出向先の出向情報しかない。
+                        setSyukkoJoho(gYCIdoJohoHDto, syukkoHukkiKbn, null, rec1Dto);
+                    } else {
+                        // 人事システムコードが一致しない。
+                        dataSetErrFlg = true;
+                    }
+                }
+
+                // ２件の場合
+            } else {
+
+                // 2016/09/23 Update by Matsui 出向元優先に変更
+                // 出向情報の共通部を設定
+                // setSyukkoJohoComon(gYCIdoJohoHDto,syukkoHukkiKbn, rec2Dto);
+
+                if (!KoseiStringUtils.isEmpty(motoJsysCd)
+                        && !KoseiStringUtils.isEmpty(sakiJsysCd)) {
+                    if (motoJsysCd.equals(rec1Dto.getJsysSbtCd())) {
+                        if (sakiJsysCd.equals(rec2Dto.getJsysSbtCd())) {
+                            setSyukkoJoho(gYCIdoJohoHDto, syukkoHukkiKbn, rec1Dto,
+                                    rec2Dto);
+                        } else {
+                            // 出向先の人事システムコードが一致しない。
+                            dataSetErrFlg = true;
+                        }
+                    } else if (motoJsysCd.equals(rec2Dto.getJsysSbtCd())) {
+                        if (sakiJsysCd.equals(rec1Dto.getJsysSbtCd())) {
+                            setSyukkoJoho(gYCIdoJohoHDto, syukkoHukkiKbn, rec2Dto,
+                                    rec1Dto);
+                        } else {
+                            // 出向先の人事システムコードが一致しない。
+                            dataSetErrFlg = true;
+                        }
+                    } else {
+                        // 出向先の人事システムコードが一致しない。
+                        dataSetErrFlg = true;
+                    }
+                } else {
+                    // 出向先の人事システムコードが一致しない。
+                    dataSetErrFlg = true;
+                }
+            }
+
+            // 出向情報と社員情報の状態が不正
+            if (dataSetErrFlg) {
+                rtnMessage = GYC08MessageId.GYC08E052;
+                String message =
+                        MessageFormat.format(this.messageAccessor.getText(rtnMessage),
+                                gYC08IdoJohoHPDto.getNameCd());
+                // エラー処理を実行
+                GYCIdoJohoMsgWDto msgWDto =
+                        new GYCIdoJohoMsgWDto(rtnMessage.toString(), message);
+                doIdoJohoErrOut2(gYC08IdoJohoHPDto, msgWDto);
+                // 異常を返却
+                return NG;
+
+            }
+        }
+
+
+        // 休職情報
+        if (gYC08IdoJohoHPDto.getLstGYCIdoJohoKyusyokuJyhDto().size() >= 1) {
+
+            int addCnt = 0;
+            int delCnt = 0;
+
+            GYCIdoJohoKyusyokuJyhDto dto = null;
+            Iterator<GYCIdoJohoKyusyokuJyhDto> itr =
+                    gYC08IdoJohoHPDto.getLstGYCIdoJohoKyusyokuJyhDto().iterator();
+            while (itr.hasNext()) {
+                // 人事異動 休職情報を取得する。
+                dto = (GYCIdoJohoKyusyokuJyhDto) itr.next();
+
+                // 処理種別ごとの件数を算出
+                if (GYCIdoJohoConst.SHORISBT_ADD.equals(dto.getKsShoriSbtHyoji())) {
+                    addCnt++;
+                } else {
+                    delCnt++;
+                }
+
+            }
+            if (addCnt > 1) {
+                rtnMessage = GYC08MessageId.GYC08E046;
+                String message =
+                        MessageFormat.format(this.messageAccessor.getText(rtnMessage),
+                                gYC08IdoJohoHPDto.getNameCd());
+                // エラー処理を実行
+                GYCIdoJohoMsgWDto msgWDto =
+                        new GYCIdoJohoMsgWDto(rtnMessage.toString(), message);
+                doIdoJohoErrOut2(gYC08IdoJohoHPDto, msgWDto);
+                // 異常を返却
+                return NG;
+            }
+            if (delCnt > 0) {
+                rtnMessage = GYC08MessageId.GYC08E049;
+                String message =
+                        MessageFormat.format(this.messageAccessor.getText(rtnMessage),
+                                gYC08IdoJohoHPDto.getNameCd());
+                // エラー処理を実行
+                GYCIdoJohoMsgWDto msgWDto =
+                        new GYCIdoJohoMsgWDto(rtnMessage.toString(), message);
+                doIdoJohoErrOut2(gYC08IdoJohoHPDto, msgWDto);
+                // 異常を返却
+                return NG;
+            }
+
+
+            // 休職情報の設定
+            this.mapper.map(dto, gYCIdoJohoHDto);
+        }
+
+
+
+        // 転籍情報
+        if (gYC08IdoJohoHPDto.getLstGYCIdoJohoTensekiJyhDto().size() >= 1) {
+
+            int addCnt = 0;
+            int delCnt = 0;
+            GYCIdoJohoTensekiJyhDto dto = null;
+            Iterator<GYCIdoJohoTensekiJyhDto> itr =
+                    gYC08IdoJohoHPDto.getLstGYCIdoJohoTensekiJyhDto().iterator();
+            while (itr.hasNext()) {
+                // 人事異動 転籍情報を取得する。
+                dto = (GYCIdoJohoTensekiJyhDto) itr.next();
+
+                // 処理種別ごとの件数を算出
+                if (GYCIdoJohoConst.SHORISBT_ADD.equals(dto.getTsShoriSbtHyoji())) {
+                    addCnt++;
+                } else {
+                    delCnt++;
+                }
+            }
+            if (addCnt > 1) {
+                rtnMessage = GYC08MessageId.GYC08E046;
+                String message =
+                        MessageFormat.format(this.messageAccessor.getText(rtnMessage),
+                                gYC08IdoJohoHPDto.getNameCd());
+                // エラー処理を実行
+                GYCIdoJohoMsgWDto msgWDto =
+                        new GYCIdoJohoMsgWDto(rtnMessage.toString(), message);
+                doIdoJohoErrOut2(gYC08IdoJohoHPDto, msgWDto);
+                // 異常を返却
+                return NG;
+            }
+            if (delCnt > 0) {
+                rtnMessage = GYC08MessageId.GYC08E049;
+                String message =
+                        MessageFormat.format(this.messageAccessor.getText(rtnMessage),
+                                gYC08IdoJohoHPDto.getNameCd());
+                // エラー処理を実行
+                GYCIdoJohoMsgWDto msgWDto =
+                        new GYCIdoJohoMsgWDto(rtnMessage.toString(), message);
+                doIdoJohoErrOut2(gYC08IdoJohoHPDto, msgWDto);
+                // 異常を返却
+                return NG;
+            }
+
+
+            // 転籍情報の設定
+            this.mapper.map(dto, gYCIdoJohoHDto);
+
+        }
+
+        // 組み合わせパラメータリスト
+        List<String> lstKumiParam = new ArrayList<>();
+        if (GYCIdoJohoConst.JOHO_UMU_ON.equals(gYCIdoJohoHDto.getSJohoUmu())) {
+
+            String sinsaiKbn = gYCIdoJohoHDto.getSSinsaiSaisaiyoKbnCd();
+            // COM人給の場合、発令を伴わない社員情報の変更の場合、新採・再採用区分コード
+            // が前回の値できてしまう対応。
+            if (GYCIdoJohoConst.JSYS_COMS.equals(gYCIdoJohoHDto.getSJsysSbtCd()) ||
+                    GYCIdoJohoConst.JSYS_SPEAD.equals(gYCIdoJohoHDto.getSJsysSbtCd())) {
+                sinsaiKbn = comsSinsaiSaiyoKbnChk(sinsaiKbn, gYCIdoJohoHDto.getNameCd());
+            }
+
+            // 出向情報と転籍情報が存在する場合、社員情報はパターンチェックの対象外とする。
+            if (!(GYCIdoJohoConst.JOHO_UMU_ON.equals(gYCIdoJohoHDto.getSkJohoUmu())
+                    || GYCIdoJohoConst.JOHO_UMU_ON.equals(gYCIdoJohoHDto.getSfJohoUmu())
+                    || GYCIdoJohoConst.JOHO_UMU_ON.equals(gYCIdoJohoHDto.getTsUmu()))) {
+
+                // 新採・再採用区分コードの存在チェック
+                switch (sinsaiKbn) {
+                    case GYCIdoJohoConst.SHINSAI_SAIYO:
+                        lstKumiParam.add("1");
+                        break;
+                    case GYCIdoJohoConst.SHINSAI_ISEKI:
+                        lstKumiParam.add("2");
+                        break;
+                    case GYCIdoJohoConst.SHINSAI_SAISAIYO:
+                        lstKumiParam.add("3");
+                        break;
+                    case " ":
+                        lstKumiParam.add("4");
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+        if (GYCIdoJohoConst.JOHO_UMU_ON.equals(gYCIdoJohoHDto.getTiJohoUmu())) {
+            // 組み合わせ情報作成
+            if (GYCIdoJohoConst.TAISHOKU_RIYU_ISEKI
+                    .equals(gYCIdoJohoHDto.getTiTaishokujiyuCd())) {
+                lstKumiParam.add("6");
+            } else {
+                lstKumiParam.add("5");
+            }
+        }
+        if (GYCIdoJohoConst.JOHO_UMU_ON.equals(gYCIdoJohoHDto.getIJohoUmu())) {
+            // 組み合わせ情報作成
+            lstKumiParam.add("7");
+        }
+        if (GYCIdoJohoConst.JOHO_UMU_ON.equals(gYCIdoJohoHDto.getSkJohoUmu())) {
+            // 組み合わせ情報作成
+            lstKumiParam.add("8");
+        }
+        if (GYCIdoJohoConst.JOHO_UMU_ON.equals(gYCIdoJohoHDto.getSfJohoUmu())) {
+            // 組み合わせ情報作成
+            lstKumiParam.add("9");
+        }
+        if (GYCIdoJohoConst.JOHO_UMU_ON.equals(gYCIdoJohoHDto.getKsJohoUmu())) {
+            if (gYCIdoJohoHDto.getKsHksykDt() == null) {
+                // 休職
+                lstKumiParam.add("A");
+            } else {
+                // 復職
+                lstKumiParam.add("B");
+            }
+        }
+        if (GYCIdoJohoConst.JOHO_UMU_ON.equals(gYCIdoJohoHDto.getTsUmu())) {
+            // 組み合わせ情報作成
+            lstKumiParam.add("C");
+        }
+
+
+
+        // 組み合わせ情報を取得
+        GYC08SokanCheckDto sokanDto = new GYC08SokanCheckDto();
+        Collections.sort(lstKumiParam);
+        StringBuffer paramas = new StringBuffer();
+        Iterator<String> itr = lstKumiParam.iterator();
+        int paramCnt = 0;
+        while (itr.hasNext()) {
+            String param = itr.next();
+            paramCnt++;
+
+            if (paramCnt == 1) {
+                sokanDto.setIdoSbtkansokancheckchi1(param);
+            } else if (paramCnt == 2) {
+                sokanDto.setIdoSbtkansokancheckchi2(param);
+            } else if (paramCnt == 3) {
+                sokanDto.setIdoSbtkansokancheckchi3(param);
+            }
+            paramas.append(param).append(",");
+        }
+
+        this.klogger.debug("    相関チェック組み合わせパターン:{}", paramas.toString());
+
+        // 複数件あれば組み合わせチェックを行う
+        if (paramCnt >= 2 && paramCnt < 4) {
+            // 異動種別間相関チェックに登録済みのパターンであるかを確認する。
+            GYC08SokanCheckDto rtnsokanDto = this.gyc08Dao.findChkSokanCheck(sokanDto);
+            if (rtnsokanDto == null) {
+                if (paramCnt == 2) {
+                    rtnMessage = GYC08MessageId.GYC08E054;
+                    String message =
+                            MessageFormat.format(this.messageAccessor.getText(rtnMessage),
+                                    gYC08IdoJohoHPDto.getNameCd());
+                    // エラー処理を実行
+                    GYCIdoJohoMsgWDto msgWDto =
+                            new GYCIdoJohoMsgWDto(rtnMessage.toString(), message);
+                    doIdoJohoErrOut2(gYC08IdoJohoHPDto, msgWDto);
+                    // 異常を返却
+                    return NG;
+                } else if (paramCnt == 3) {
+                    rtnMessage = GYC08MessageId.GYC08E055;
+                    String message =
+                            MessageFormat.format(this.messageAccessor.getText(rtnMessage),
+                                    gYC08IdoJohoHPDto.getNameCd());
+                    // エラー処理を実行
+                    GYCIdoJohoMsgWDto msgWDto =
+                            new GYCIdoJohoMsgWDto(rtnMessage.toString(), message);
+                    doIdoJohoErrOut2(gYC08IdoJohoHPDto, msgWDto);
+                    // 異常を返却
+                    return NG;
+                }
+            }
+
+        } else if (paramCnt >= 4) {
+
+            rtnMessage = GYC08MessageId.GYC08E056;
+            // ４種類以上のデータがある。
+            String message =
+                    MessageFormat.format(this.messageAccessor.getText(rtnMessage),
+                            gYC08IdoJohoHPDto.getNameCd());
+            // エラー処理を実行
+            GYCIdoJohoMsgWDto msgWDto =
+                    new GYCIdoJohoMsgWDto(rtnMessage.toString(), message);
+            doIdoJohoErrOut2(gYC08IdoJohoHPDto, msgWDto);
+            // 異常を返却
+            return NG;
+        }
+
+        return OK;
+    }
+
+
+
+    /**
+     * <p>[概 要] comsSinsaiSaiyoKbnChk メソッド。</p>
+     * <p>[詳 細] COMS新採・再採用区分コードチェック</p>
+     * <p>[備 考] COM人給の場合、発令を伴わない社員情報の変更の場合、新採・再採用区分コードが前回値できてしまう対応。</p>
+     *
+     * @param sinsaiKbn 新採・再採用区分コード
+     * @param nameCode 社員氏名コード
+     * @return チェック済み新採・再採用区分コード
+     */
+    private String comsSinsaiSaiyoKbnChk(String sinsaiKbn, String nameCode) {
+
+        String chkSinsaiKbn = sinsaiKbn;
+        // 社員テーブルの値
+        GYCShainJohoDto shinTblDto = new GYCShainJohoDto();
+        // 共通関数から社員テーブルの値を取得
+        shinTblDto = this.gYCIdoJohoDao.findShainJoho(nameCode);
+        // 前回の新採・再採用区分コード（採用種別コード）を取得する。
+        if (shinTblDto != null && shinTblDto.getSaiyoSbtCd() != null) {
+            if (shinTblDto.getSaiyoSbtCd().equals(sinsaiKbn)) {
+                
+                if(!GYCIdoJohoConst.ZAISHOKU_KBN_TAISHOKU
+                        .equals(shinTblDto.getZaishokKbnCd())){
+                    
+                    // 更新前社員情報が退職ではない かつ 前回値と一致した場合、その他へ変更する
+                    chkSinsaiKbn = " ";
+                }
+            }
+        }
+
+        return chkSinsaiKbn;
+    }
+
+
+
+    /**
+     * <p>[概 要] doIdoJohoToroku メソッド。</p>
+     * <p>[詳 細] 異動情報登録処理</p>
+     * <p>[備 考] </p>
+     *
+     * @param gYC08IdoJohoHPDto 異動情報振分前DTO
+     * @param gYCIdoJohoHDto 異動情報振分済みDTO
+     * @param exsistFlg データ存在フラグ
+     */
+    private void doIdoJohoToroku(GYC08IdoJohoHPDto gYC08IdoJohoHPDto,
+            GYCIdoJohoHDto gYCIdoJohoHDto, boolean exsistFlg) {
+
+        this.klogger.debug("【 登録処理 開始 】   社員氏名コード:{} 異動発生年月日:{}--> ",
+                gYCIdoJohoHDto.getNameCd(), gYCIdoJohoHDto.getIdohasseinengappi());
+
+
+        // データが存在していた場合は該当データを削除します。
+        if (exsistFlg) {
+            int delCnt = 0;
+            // 削除する。
+            delCnt = this.gyc08Dao.deleteIdoJohoHByPk(gYCIdoJohoHDto);
+            this.klogger.debug("    該当データ削除 件数：{}", delCnt);
+        }
+
+
+        // 人事異動情報振分済みワークTbl 登録 !
+        this.gyc08Dao.insertIdoJohoH(gYCIdoJohoHDto);
+
+
+        // メッセージ作成
+        String rstMsg = "";
+        boolean wrnFlg = false;
+        // 共通部
+        if (KoseiStringUtils.isEmpty(gYC08IdoJohoHPDto.getShimei())
+                && KoseiStringUtils.isEmpty(gYC08IdoJohoHPDto.getKaishaNm())) {
+            rstMsg = MessageFormat.format(RST_MSG2, gYC08IdoJohoHPDto.getNameCd());
+        } else {
+            rstMsg = MessageFormat.format(RST_MSG1, gYC08IdoJohoHPDto.getNameCd(),
+                    gYC08IdoJohoHPDto.getShimei(), gYC08IdoJohoHPDto.getKaishaNm(),
+                    gYC08IdoJohoHPDto.getSosikiNm());
+        }
+        // 警告メッセージ
+        Iterator<String> msgItr = gYC08IdoJohoHPDto.getLstWrnMsg().iterator();
+        while (msgItr.hasNext()) {
+            rstMsg = rstMsg + ";" + msgItr.next();
+            wrnFlg = true;
+        }
+
+        // 異動情報メッセージワークの作成
+        GYCIdoJohoMsgWDto msgWDto = new GYCIdoJohoMsgWDto(rstMsg);
+        msgWDto.setJobId(this.functionId);
+        msgWDto.setCreateUserId(gYC08IdoJohoHPDto.getCreateUserId());
+        msgWDto.setLastUpdateUserId(gYC08IdoJohoHPDto.getLastUpdateUserId());
+        msgWDto.setNameCd(gYC08IdoJohoHPDto.getNameCd());
+        msgWDto.setIdohasseinengappi(gYC08IdoJohoHPDto.getIdohasseinengappi());
+        if (wrnFlg) {
+            // レベルを(W)で登録
+            msgWDto.setErrLevel("W");
+        } else {
+            // レベルを(I)で登録
+            msgWDto.setErrLevel("I");
+        }
+
+
+        int nomalCnt = 0;
+
+        Iterator<GYC08IdoJohoCDto> itr =
+                gYC08IdoJohoHPDto.getLstGYC08IdoJohoCDto().iterator();
+        while (itr.hasNext()) {
+            // 人事異動情報を取得する。
+            GYC08IdoJohoCDto dto = (GYC08IdoJohoCDto) itr.next();
+            msgWDto.setJinjiidojyh(dto.getJinjiidojyh());
+            msgWDto.setJsysSbtCd(dto.getJsysSbtCd());
+            msgWDto.setIdoSbtCd(dto.getIdoSbtCd());
+            msgWDto.setIdofilegyoNo(dto.getIdofilegyoNo());
+
+            GYC08IdoJohoMsgWRstFileDto msgWFileDto = new GYC08IdoJohoMsgWRstFileDto();
+            // エラー情報に情報をコピーする。
+            this.mapper.map(msgWDto, msgWFileDto);
+
+            // 人事システムコード(和名変換）
+            Map<String, String> jsysCodeMap = jsysCodeList.asMap();
+            if (!jsysCodeMap.containsKey(dto.getJsysSbtCd())) {
+                if (GYCIdoJohoConst.JSYS_SONOTA.equals(dto.getJsysSbtCd())) {
+                    msgWFileDto.setJsysSbtCd(JSYS_SONOT_NM);
+                } else {
+                    msgWFileDto.setJsysSbtCd(dto.getJsysSbtCd());
+                }
+            } else {
+                msgWFileDto.setJsysSbtCd(jsysCodeMap.get(dto.getJsysSbtCd()));
+            }
+            // ファイルへデータを出力
+            msgWFileDto.setErrMsg("\"" + msgWFileDto.getErrMsg() + "\"");
+            msgWFileDto.setNameCd("\"" + msgWFileDto.getNameCd() + "\"");
+            if (!KoseiStringUtils.isEmpty(msgWFileDto.getIdohasseinengappi())) {
+                msgWFileDto.setIdohasseinengappi(
+                        msgWFileDto.getIdohasseinengappi().replace("-", "/"));
+            }
+            msgWFileDto.setIdohasseinengappi(
+                    "\"" + msgWFileDto.getIdohasseinengappi() + "\"");
+            msgWFileDto.setJsysSbtCd("\"" + msgWFileDto.getJsysSbtCd() + "\"");
+            msgWFileDto.setIdofilegyoNo("\"" + msgWFileDto.getIdofilegyoNo() + "\"");
+
+            rstlistFileLineWriter.writeData(msgWFileDto);
+            // 人事異動情報メッセージワークへ登録する。
+            this.gyc08Dao.insertIdoJohoMsgW(msgWDto);
+
+
+
+            nomalCnt++;
+        }
+
+        gYC08IdoJohoHPDto.setNomalCnt(nomalCnt);
+        this.klogger.debug("【 登録処理 終了 】    対象件数:{} ", nomalCnt);
+    }
+
+    /**
+     * <p>[概 要] setShainJoho メソッド。</p>
+     * <p>[詳 細] 社員情報設定処理（優先対応）</p>
+     * <p>[備 考] </p>
+     *
+     * @param gYCIdoJohoHDto 人事異動情報振分済みＤＴＯ
+     * @param syukkoSbtCd 出向種別
+     * @param shainMoto 出向元の社員情報
+     * @param shainSaki 出向先の社員情報
+     */
+    private void setShainJoho(GYCIdoJohoHDto gYCIdoJohoHDto, String syukkoSbtCd,
+            GYCIdoJohoSinJyhDto shainMoto, GYCIdoJohoSinJyhDto shainSaki) {
+
+        // 出向元のデータがあれば、出向元を優先的に設定
+        if (shainMoto != null) {
+            this.mapper.map(shainMoto, gYCIdoJohoHDto);
+        } else if (shainSaki != null) {
+            this.mapper.map(shainSaki, gYCIdoJohoHDto);
+        }
+
+        if (shainMoto == null || shainSaki == null) {
+            // 社員テーブルの値
+            GYCShainJohoDto shinTblDto = new GYCShainJohoDto();
+            // 共通関数から社員テーブルの値を取得
+            shinTblDto = this.gYCIdoJohoDao.findShainJoho(gYCIdoJohoHDto.getNameCd());
+            // 社員情報が存在する場合は以下の項目は社員情報で初期化
+            if (shinTblDto != null) {
+                // 社員テーブルの値で更新する。
+                // 会社コード
+                if (!KoseiStringUtils.isEmpty(shinTblDto.getSyukkomotoKaishaCd())) {
+                    gYCIdoJohoHDto.setSKaishaCd(shinTblDto.getSyukkomotoKaishaCd());
+                }
+                // 組織コード
+                if (!KoseiStringUtils.isEmpty(shinTblDto.getSyukkomotoSoshikiCd())) {
+                    gYCIdoJohoHDto.setSSoshikiCd(shinTblDto.getSyukkomotoSoshikiCd());
+                }
+                // 部課コード
+                if (!KoseiStringUtils.isEmpty(shinTblDto.getSyukkomotoBukaCd())) {
+                    gYCIdoJohoHDto.setSBukaCd(shinTblDto.getSyukkomotoBukaCd());
+                }
+                // 社員区分コード
+                if (!KoseiStringUtils.isEmpty(shinTblDto.getSihKbnCd())) {
+                    gYCIdoJohoHDto.setSSihKbnCd(shinTblDto.getSihKbnCd());
+                }
+                // 在職区分コード
+                if (!KoseiStringUtils.isEmpty(shinTblDto.getZaishokKbnCd())) {
+                    gYCIdoJohoHDto.setSZaishokKbnCd(shinTblDto.getZaishokKbnCd());
+                }
+                // 社員資格
+                if (!KoseiStringUtils.isEmpty(shinTblDto.getSihshikaku())) {
+                    gYCIdoJohoHDto.setSSihshikaku(shinTblDto.getSihshikaku());
+                }
+                // 社員資格名称
+                if (!KoseiStringUtils.isEmpty(shinTblDto.getShokunoshikakuNm())) {
+                    gYCIdoJohoHDto.setSSihshikakuNm(shinTblDto.getShokunoshikakuNm());
+                }
+                // 勤務先メールアドレス（出向元メールアドレス）
+                if (!KoseiStringUtils.isEmpty(shinTblDto.getShukkouMotoMail())) {
+                    gYCIdoJohoHDto.setSKinmusakiMail(shinTblDto.getShukkouMotoMail());
+                }
+
+                // 給与支給会社コード
+                if (!KoseiStringUtils.isEmpty(shinTblDto.getKyuyoSikyukaishaCd())) {
+                    gYCIdoJohoHDto
+                            .setSKyuyoSikyukaishaCd(shinTblDto.getKyuyoSikyukaishaCd());
+                }
+                // 給与組織コード
+                if (!KoseiStringUtils.isEmpty(shinTblDto.getKyuyoSikyusoshikiCd())) {
+                    gYCIdoJohoHDto
+                            .setSKyuyoSikyusoshikiCd(shinTblDto.getKyuyoSikyusoshikiCd());
+                }
+                // 給与部課コード
+                if (!KoseiStringUtils.isEmpty(shinTblDto.getKyuyoSikyubukaCd())) {
+                    gYCIdoJohoHDto.setSKyuyoSikyubukaCd(shinTblDto.getKyuyoSikyubukaCd());
+                }
+                
+                // Mantis2750対応  給与区分
+                if (!KoseiStringUtils.isEmpty(shinTblDto.getKyuyoSikyuKbnCd())) {
+                    gYCIdoJohoHDto.setSKyuyoSikyuKbnCd(shinTblDto.getKyuyoSikyuKbnCd());
+                }
+
+                // 勤務先電話番号
+                if (!KoseiStringUtils.isEmpty(shinTblDto.getKinmusakiTel())) {
+                    gYCIdoJohoHDto.setSKinmusakiTel(shinTblDto.getKinmusakiTel());
+                }
+                // 勤務先都道府県コード
+                if (!KoseiStringUtils.isEmpty(shinTblDto.getKinmusakitodoufukenCd())) {
+                    gYCIdoJohoHDto.setSKinmusakitodoufukenCd(
+                            shinTblDto.getKinmusakitodoufukenCd());
+                }
+                // 勤務先ビル会社コード
+                if (!KoseiStringUtils
+                        .isEmpty(shinTblDto.getKinmusakibuildingkaishaCd())) {
+                    gYCIdoJohoHDto.setSKinmusakibuildingkaishaCd(
+                            shinTblDto.getKinmusakibuildingkaishaCd());
+                }
+                // 勤務先ビルコード
+                if (!KoseiStringUtils.isEmpty(shinTblDto.getKinmusakibuildingCd())) {
+                    gYCIdoJohoHDto
+                            .setSKinmusakibuildingCd(shinTblDto.getKinmusakibuildingCd());
+                }
+                // 勤務先ビル名
+                if (!KoseiStringUtils.isEmpty(shinTblDto.getKinmusakibuildingNm())) {
+                    gYCIdoJohoHDto
+                            .setSKinmusakiBldgNm(shinTblDto.getKinmusakibuildingNm());
+                }
+
+            }
+
+        }
+
+
+        // 出向元のデータで更新するもの
+        if (shainMoto != null) {
+            // 会社コード
+            gYCIdoJohoHDto.setSKaishaCd(shainMoto.getSKaishaCd());
+            // 組織コード
+            gYCIdoJohoHDto.setSSoshikiCd(shainMoto.getSSoshikiCd());
+            // 部課コード
+            gYCIdoJohoHDto.setSBukaCd(shainMoto.getSBukaCd());
+            // 社員区分コード
+            gYCIdoJohoHDto.setSSihKbnCd(shainMoto.getSSihKbnCd());
+            // 在職区分コード
+            gYCIdoJohoHDto.setSZaishokKbnCd(shainMoto.getSZaishokKbnCd());
+            // 社員資格
+            gYCIdoJohoHDto.setSSihshikaku(shainMoto.getSSihshikaku());
+            // 社員資格名称
+            gYCIdoJohoHDto.setSSihshikakuNm(shainMoto.getSSihshikakuNm());
+            // 勤務先メールアドレス
+            gYCIdoJohoHDto.setSKinmusakiMail(shainMoto.getSKinmusakiMail());
+
+            // 出向種別コードが在Ａ以外の場合
+            if (!ZAI_A.equals(syukkoSbtCd)) {
+                // 給与支給会社コード
+                gYCIdoJohoHDto.setSKyuyoSikyukaishaCd(shainMoto.getSKyuyoSikyukaishaCd());
+                // 給与組織コード
+                gYCIdoJohoHDto
+                        .setSKyuyoSikyusoshikiCd(shainMoto.getSKyuyoSikyusoshikiCd());
+                // 給与部課コード
+                gYCIdoJohoHDto.setSKyuyoSikyubukaCd(shainMoto.getSKyuyoSikyubukaCd());
+                
+                //Mantis2750対応  給与区分 
+                gYCIdoJohoHDto.setSKyuyoSikyuKbnCd(shainMoto.getSKyuyoSikyuKbnCd());
+                
+            }
+        }
+
+        // 出向元のデータで更新するもの
+        if (shainSaki != null) {
+
+            // 出向種別コードが在Ａの場合
+            if (ZAI_A.equals(syukkoSbtCd)) {
+                // 給与支給会社コード
+                gYCIdoJohoHDto.setSKyuyoSikyukaishaCd(shainSaki.getSKyuyoSikyukaishaCd());
+                // 給与組織コード
+                gYCIdoJohoHDto
+                        .setSKyuyoSikyusoshikiCd(shainSaki.getSKyuyoSikyusoshikiCd());
+                // 給与部課コード
+                gYCIdoJohoHDto.setSKyuyoSikyubukaCd(shainSaki.getSKyuyoSikyubukaCd());
+                
+                //Mantis2750対応  給与区分 
+                gYCIdoJohoHDto.setSKyuyoSikyuKbnCd(shainSaki.getSKyuyoSikyuKbnCd());
+                
+            }
+
+            // 勤務先電話番号
+            gYCIdoJohoHDto.setSKinmusakiTel(shainSaki.getSKinmusakiTel());
+            // 勤務先都道府県コード
+            gYCIdoJohoHDto
+                    .setSKinmusakitodoufukenCd(shainSaki.getSKinmusakitodoufukenCd());
+            // 勤務先ビル会社コード
+            gYCIdoJohoHDto.setSKinmusakibuildingkaishaCd(
+                    shainSaki.getSKinmusakibuildingkaishaCd());
+            // 勤務先ビルコード
+            gYCIdoJohoHDto.setSKinmusakibuildingCd(shainSaki.getSKinmusakibuildingCd());
+            // 勤務先ビル名
+            gYCIdoJohoHDto.setSKinmusakiBldgNm(shainSaki.getSKinmusakiBldgNm());
+        }
+    }
+
+
+    /**
+     * <p>[概 要] setSyukkoJohoComon メソッド。</p>
+     * <p>[詳 細] 出向情報の共通更新項目設定</p>
+     * <p>[備 考] </p>
+     *
+     * @param gYCIdoJohoHDto 人事異動情報振分済みＤＴＯ
+     * @param syukkoHukkiKbn 出向復帰区分
+     * @param syukkoDto 出向情報
+     */
+    private void setSyukkoJohoComon(GYCIdoJohoHDto gYCIdoJohoHDto, String syukkoHukkiKbn,
+            GYCIdoJohoSyukkoDto syukkoDto) {
+
+        if (GYCIdoJohoConst.SYUKKO_KAISHI.equals(syukkoHukkiKbn)) {
+            // 情報有無
+            gYCIdoJohoHDto.setSkJohoUmu(syukkoDto.getJohoUmu());
+            // 人事システム種別コード
+            gYCIdoJohoHDto.setSkJsysSbtCd(syukkoDto.getJsysSbtCd());
+            // 異動種別コード
+            gYCIdoJohoHDto.setSkIdoSbtCd(syukkoDto.getIdoSbtCd());
+            // 処理種別表示
+            gYCIdoJohoHDto.setSkShoriSbtHyoji(syukkoDto.getShoriSbtHyoji());
+            // 出向開始年月日
+            gYCIdoJohoHDto.setSkSyukkoKaishiDt(syukkoDto.getSyukkoKaishiDt());
+            // 出向種別
+            gYCIdoJohoHDto.setSkSyukkoSbt(syukkoDto.getSyukkoSbt());
+            // 出向復帰区分
+            gYCIdoJohoHDto.setSkSyukkoHukkiKbn(syukkoDto.getSyukkoHukkiKbn());
+            // 出向復帰年月日
+            gYCIdoJohoHDto.setSkSyukkoHukkiDt(syukkoDto.getSyukkoHukkiDt());
+            // 出向異動要因コード
+            gYCIdoJohoHDto.setSkSyukkoIdoYoinCd(syukkoDto.getSyukkoIdoYoinCd());
+
+        } else {
+            // 情報有無
+            gYCIdoJohoHDto.setSfJohoUmu(syukkoDto.getJohoUmu());
+            // 人事システム種別コード
+            gYCIdoJohoHDto.setSfJsysSbtCd(syukkoDto.getJsysSbtCd());
+            // 異動種別コード
+            gYCIdoJohoHDto.setSfIdoSbtCd(syukkoDto.getIdoSbtCd());
+            // 処理種別表示
+            gYCIdoJohoHDto.setSfShoriSbtHyoji(syukkoDto.getShoriSbtHyoji());
+            // 出向開始年月日
+            gYCIdoJohoHDto.setSfSyukkoKaishiDt(syukkoDto.getSyukkoKaishiDt());
+            // 出向種別
+            gYCIdoJohoHDto.setSfSyukkoSbt(syukkoDto.getSyukkoSbt());
+            // 出向復帰区分
+            gYCIdoJohoHDto.setSfSyukkoHukkiKbn(syukkoDto.getSyukkoHukkiKbn());
+            // 出向復帰年月日
+            gYCIdoJohoHDto.setSfSyukkoHukkiDt(syukkoDto.getSyukkoHukkiDt());
+            // 出向異動要因コード
+            gYCIdoJohoHDto.setSfSyukkoIdoYoinCd(syukkoDto.getSyukkoIdoYoinCd());
+
+        }
+    }
+
+    /**
+     * <p>[概 要] setSyukkoJoho メソッド。</p>
+     * <p>[詳 細] 出向情報設定処理</p>
+     * <p>[備 考] </p>
+     *
+     * @param gYCIdoJohoHDto 人事異動情報振分済みＤＴＯ
+     * @param syukkoHukkiKbn 出向復帰区分
+     * @param syukkoMoto 出向元の出向情報
+     * @param syukkoSaki 出向先の出向情報
+     */
+    private void setSyukkoJoho(GYCIdoJohoHDto gYCIdoJohoHDto, String syukkoHukkiKbn,
+            GYCIdoJohoSyukkoDto syukkoMoto, GYCIdoJohoSyukkoDto syukkoSaki) {
+
+        String setData = "";
+
+        // 共通部分は出向元が優先
+        if (syukkoMoto != null) {
+            setSyukkoJohoComon(gYCIdoJohoHDto, syukkoHukkiKbn, syukkoMoto);
+        } else if (syukkoSaki != null) {
+            setSyukkoJohoComon(gYCIdoJohoHDto, syukkoHukkiKbn, syukkoSaki);
+        }
+
+        // 社員情報を取得
+        GYCShainJohoDto shinTblDto = null;
+        if (!(syukkoMoto != null && syukkoSaki != null)) {
+            // 共通関数から社員テーブルの値を取得
+            shinTblDto = this.gYCIdoJohoDao.findShainJoho(gYCIdoJohoHDto.getNameCd());
+        }
+
+
+        if (GYCIdoJohoConst.SYUKKO_KAISHI.equals(syukkoHukkiKbn)) {
+
+            // 以下 出向情報 出向開始の情報を更新
+
+            // 給与支給等の初期化
+            if (syukkoMoto != null) {
+                // 給与支給会社コード
+                gYCIdoJohoHDto
+                        .setSkKyuyoSikyukaishaCd(syukkoMoto.getKyuyoSikyukaishaCd());
+                // 給与組織コード
+                gYCIdoJohoHDto
+                        .setSkKyuyoSikyusoshikiCd(syukkoMoto.getKyuyoSikyusoshikiCd());
+                // 給与部課コード
+                gYCIdoJohoHDto.setSkKyuyoSikyubukaCd(syukkoMoto.getKyuyoSikyubukaCd());
+
+            } else if (syukkoSaki != null) {
+                // 給与支給会社コード
+                gYCIdoJohoHDto
+                        .setSkKyuyoSikyukaishaCd(syukkoSaki.getKyuyoSikyukaishaCd());
+                // 給与組織コード
+                gYCIdoJohoHDto
+                        .setSkKyuyoSikyusoshikiCd(syukkoSaki.getKyuyoSikyusoshikiCd());
+                // 給与部課コード
+                gYCIdoJohoHDto.setSkKyuyoSikyubukaCd(syukkoSaki.getKyuyoSikyubukaCd());
+
+            }
+            // 社員テーブルがあれば、社員テーブルの値で上書き
+            if (shinTblDto != null) {
+                // 給与支給会社コード
+                if (!KoseiStringUtils.isEmpty(shinTblDto.getKyuyoSikyukaishaCd())) {
+                    gYCIdoJohoHDto
+                            .setSkKyuyoSikyukaishaCd(shinTblDto.getKyuyoSikyukaishaCd());
+                }
+                // 給与組織コード
+                if (!KoseiStringUtils.isEmpty(shinTblDto.getKyuyoSikyusoshikiCd())) {
+                    gYCIdoJohoHDto.setSkKyuyoSikyusoshikiCd(
+                            shinTblDto.getKyuyoSikyusoshikiCd());
+                }
+                // 給与部課コード
+                if (!KoseiStringUtils.isEmpty(shinTblDto.getKyuyoSikyubukaCd())) {
+                    gYCIdoJohoHDto
+                            .setSkKyuyoSikyubukaCd(shinTblDto.getKyuyoSikyubukaCd());
+                }
+            }
+
+
+
+            // 出向元が設定されてい場合
+            if (syukkoMoto != null) {
+                // 出向元会社コード
+                setData = syukkoMoto.getSyukkomotoKaishaCd();
+                gYCIdoJohoHDto.setSkSyukkomotoKaishaCd(setData);
+
+                // 出向元組織コード
+                setData = syukkoMoto.getSyukkomotoSoshikiCd();
+                gYCIdoJohoHDto.setSkSyukkomotoSoshikiCd(setData);
+
+
+            } else {
+                // 以下、出向元データが無い場合、社員テーブルが未設定の場合、出向先の設定値で更新する。
+                if (shinTblDto != null) {
+                    // 出向元会社コード
+                    if (KoseiStringUtils.isEmpty(shinTblDto.getSyukkomotoKaishaCd())) {
+                        // 社員テーブルが未設定、出向先の情報が設定されている場合
+                        if (syukkoSaki != null && !KoseiStringUtils
+                                .isEmpty(syukkoSaki.getSyukkomotoKaishaCd())) {
+                            // 出向元会社コードを出向先の情報を設定
+                            gYCIdoJohoHDto.setSkSyukkomotoKaishaCd(
+                                    syukkoSaki.getSyukkomotoKaishaCd());
+                        }
+                    } else {
+                        // DBの値を設定
+                        gYCIdoJohoHDto.setSkSyukkomotoKaishaCd(
+                                shinTblDto.getSyukkomotoKaishaCd());
+                    }
+
+                    // 出向元組織コード
+                    if (KoseiStringUtils.isEmpty(shinTblDto.getSyukkomotoSoshikiCd())) {
+                        // 社員テーブルが未設定、出向先の情報が設定されている場合
+                        if (syukkoSaki != null && !KoseiStringUtils
+                                .isEmpty(syukkoSaki.getSyukkomotoSoshikiCd())) {
+                            // 出向元組織コードを出向先の情報を設定
+                            gYCIdoJohoHDto.setSkSyukkomotoSoshikiCd(
+                                    syukkoSaki.getSyukkomotoSoshikiCd());
+                        }
+                    } else {
+                        // DBの値を設定
+                        gYCIdoJohoHDto.setSkSyukkomotoSoshikiCd(
+                                shinTblDto.getSyukkomotoSoshikiCd());
+                    }
+                } else {
+                    // 社員TBLがなく、出向先の出向元情報が設定されていた場合、それを設定
+                    // 出向元会社コード
+                    if (syukkoSaki != null && !KoseiStringUtils
+                            .isEmpty(syukkoSaki.getSyukkomotoKaishaCd())) {
+                        // 出向元会社コードを出向先の情報を設定
+                        gYCIdoJohoHDto.setSkSyukkomotoKaishaCd(
+                                syukkoSaki.getSyukkomotoKaishaCd());
+                    }
+                    // 出向元組織コード
+                    if (syukkoSaki != null && !KoseiStringUtils
+                            .isEmpty(syukkoSaki.getSyukkomotoSoshikiCd())) {
+                        // 出向元組織コードを出向先の情報を設定
+                        gYCIdoJohoHDto.setSkSyukkomotoSoshikiCd(
+                                syukkoSaki.getSyukkomotoSoshikiCd());
+                    }
+                }
+
+            }
+
+            // 出向元があり、在Aではない場合のみ上書き
+            if (syukkoMoto != null) {
+                if (!ZAI_A.equals(syukkoMoto.getSyukkoSbt())) {
+                    // 給与支給会社コード
+                    gYCIdoJohoHDto
+                            .setSkKyuyoSikyukaishaCd(syukkoMoto.getKyuyoSikyukaishaCd());
+                    // 給与組織コード
+                    gYCIdoJohoHDto.setSkKyuyoSikyusoshikiCd(
+                            syukkoMoto.getKyuyoSikyusoshikiCd());
+                    // 給与部課コード
+                    gYCIdoJohoHDto
+                            .setSkKyuyoSikyubukaCd(syukkoMoto.getKyuyoSikyubukaCd());
+                }
+            }
+            // 出向先があり、在Aの場合のみ上書き
+            if (syukkoSaki != null) {
+                if (ZAI_A.equals(syukkoSaki.getSyukkoSbt())) {
+                    // 給与支給会社コード
+                    gYCIdoJohoHDto
+                            .setSkKyuyoSikyukaishaCd(syukkoSaki.getKyuyoSikyukaishaCd());
+                    // 給与組織コード
+                    gYCIdoJohoHDto.setSkKyuyoSikyusoshikiCd(
+                            syukkoSaki.getKyuyoSikyusoshikiCd());
+                    // 給与部課コード
+                    gYCIdoJohoHDto
+                            .setSkKyuyoSikyubukaCd(syukkoSaki.getKyuyoSikyubukaCd());
+                }
+            }
+
+            if (syukkoSaki != null) {
+                // 出向先会社コード
+                gYCIdoJohoHDto
+                        .setSkSyukkosakiKaishaCd(syukkoSaki.getSyukkosakiKaishaCd());
+                // 出向先会社名称
+                gYCIdoJohoHDto
+                        .setSkSyukkosakiKaishaNm(syukkoSaki.getSyukkosakiKaishaNm());
+                // 出向先組織コード
+                gYCIdoJohoHDto
+                        .setSkSyukkosakiSoshikiCd(syukkoSaki.getSyukkosakiSoshikiCd());
+                // 出向先部課コード
+                gYCIdoJohoHDto.setSkSyukkosakiBukaCd(syukkoSaki.getSyukkosakiBukaCd());
+                // 出向先社員区分コード
+                gYCIdoJohoHDto
+                        .setSkSyukkosakiSihKbnCd(syukkoSaki.getSyukkosakiSihKbnCd());
+                // 出向先在職区分コード
+                gYCIdoJohoHDto.setSkSyukkosakiZaishokKbnCd(
+                        syukkoSaki.getSyukkosakiZaishokKbnCd());
+                // 出向先社員資格
+                gYCIdoJohoHDto.setSkSyukkoSihshikaku(syukkoSaki.getSyukkoSihshikaku());
+                // 出向先社員資格名称
+                gYCIdoJohoHDto
+                        .setSkSyukkoSihshikakuNm(syukkoSaki.getSyukkoSihshikakuNm());
+                // 出向先メールアドレス
+                gYCIdoJohoHDto.setSkShukkouSakiMail(syukkoSaki.getShukkouSakiMail());
+            } else {
+                // 以下、出向先データが無い場合、社員テーブルが未設定の場合、出向元の設定値で更新する。
+                if (shinTblDto != null) {
+                    // 出向先会社コード
+                    if (KoseiStringUtils.isEmpty(shinTblDto.getSyukkosakiKaishaCd())) {
+                        // 社員テーブルが未設定、出向元の情報が設定されている場合
+                        if (syukkoMoto != null && !KoseiStringUtils
+                                .isEmpty(syukkoMoto.getSyukkosakiKaishaCd())) {
+                            // 出向元会社コードを出向元の情報を設定
+                            gYCIdoJohoHDto.setSkSyukkosakiKaishaCd(
+                                    syukkoMoto.getSyukkosakiKaishaCd());
+                        }
+                    } else {
+                        gYCIdoJohoHDto.setSkSyukkosakiKaishaCd(
+                                shinTblDto.getSyukkosakiKaishaCd());
+                    }
+
+                    // 出向先会社名称(社員テーブルにカラムなし）
+                    // 出向元の情報が設定されている場合
+                    if (syukkoMoto != null && !KoseiStringUtils
+                            .isEmpty(syukkoMoto.getSyukkosakiKaishaNm())) {
+                        // 出向先会社名称を出向元の情報を設定
+                        gYCIdoJohoHDto.setSkSyukkosakiKaishaNm(
+                                syukkoMoto.getSyukkosakiKaishaNm());
+                    }
+
+                    // 出向先組織コード
+                    if (KoseiStringUtils.isEmpty(shinTblDto.getSyukkosakiSoshikiCd())) {
+                        // 社員テーブルが未設定、出向元の情報が設定されている場合
+                        if (syukkoMoto != null && !KoseiStringUtils
+                                .isEmpty(syukkoMoto.getSyukkosakiSoshikiCd())) {
+                            // 出向先組織コードを出向元の情報を設定
+                            gYCIdoJohoHDto.setSkSyukkosakiSoshikiCd(
+                                    syukkoMoto.getSyukkosakiSoshikiCd());
+                        }
+                    } else {
+                        gYCIdoJohoHDto.setSkSyukkosakiSoshikiCd(
+                                shinTblDto.getSyukkosakiSoshikiCd());
+                    }
+
+                    // 出向先部課コード
+                    if (KoseiStringUtils.isEmpty(shinTblDto.getSyukkosakiBukaCd())) {
+                        // 社員テーブルが未設定、出向元の情報が設定されている場合
+                        if (syukkoMoto != null && !KoseiStringUtils
+                                .isEmpty(syukkoMoto.getSyukkosakiBukaCd())) {
+                            // 出向先部課コードを出向元の情報を設定
+                            gYCIdoJohoHDto.setSkSyukkosakiBukaCd(
+                                    syukkoMoto.getSyukkosakiBukaCd());
+                        }
+                    } else {
+                        gYCIdoJohoHDto
+                                .setSkSyukkosakiBukaCd(shinTblDto.getSyukkosakiBukaCd());
+                    }
+
+                    // 出向先社員区分コード
+                    if (KoseiStringUtils.isEmpty(shinTblDto.getSyukkosakiSihKbnCd())) {
+                        // 社員テーブルが未設定、出向元の情報が設定されている場合
+                        if (syukkoMoto != null && !KoseiStringUtils
+                                .isEmpty(syukkoMoto.getSyukkosakiSihKbnCd())) {
+                            /// 出向先社員区分コードを出向元の情報を設定
+                            gYCIdoJohoHDto.setSkSyukkosakiSihKbnCd(
+                                    syukkoMoto.getSyukkosakiSihKbnCd());
+                        }
+                    } else {
+                        gYCIdoJohoHDto.setSkSyukkosakiSihKbnCd(
+                                shinTblDto.getSyukkosakiSihKbnCd());
+                    }
+
+                    // 出向先在職区分コード
+                    if (KoseiStringUtils
+                            .isEmpty(shinTblDto.getSyukkosakiZaishokKbnCd())) {
+                        // 社員テーブルが未設定、出向元の情報が設定されている場合
+                        if (syukkoMoto != null && !KoseiStringUtils
+                                .isEmpty(syukkoMoto.getSyukkosakiZaishokKbnCd())) {
+                            /// 出向先在職区分コードを出向元の情報を設定
+                            gYCIdoJohoHDto.setSkSyukkosakiZaishokKbnCd(
+                                    syukkoMoto.getSyukkosakiZaishokKbnCd());
+                        }
+                    } else {
+                        gYCIdoJohoHDto.setSkSyukkosakiZaishokKbnCd(
+                                shinTblDto.getSyukkosakiZaishokKbnCd());
+                    }
+
+                    // 出向先社員資格
+                    if (KoseiStringUtils.isEmpty(shinTblDto.getSyukkoSihshikaku())) {
+                        // 社員テーブルが未設定、出向元の情報が設定されている場合
+                        if (syukkoMoto != null && !KoseiStringUtils
+                                .isEmpty(syukkoMoto.getSyukkoSihshikaku())) {
+                            /// 出向先社員資格を出向元の情報を設定
+                            gYCIdoJohoHDto.setSkSyukkoSihshikaku(
+                                    syukkoMoto.getSyukkoSihshikaku());
+                        }
+                    } else {
+                        gYCIdoJohoHDto
+                                .setSkSyukkoSihshikaku(shinTblDto.getSyukkoSihshikaku());
+                    }
+
+                    // 出向先社員資格名
+                    if (KoseiStringUtils
+                            .isEmpty(shinTblDto.getSyukkoShokunoshikakuNm())) {
+                        // 社員テーブルが未設定、出向元の情報が設定されている場合
+                        if (syukkoMoto != null && !KoseiStringUtils
+                                .isEmpty(syukkoMoto.getSyukkoSihshikakuNm())) {
+                            /// 出向先社員資格名を出向元の情報を設定
+                            gYCIdoJohoHDto.setSkSyukkoSihshikakuNm(
+                                    syukkoMoto.getSyukkoSihshikakuNm());
+                        }
+                    } else {
+                        gYCIdoJohoHDto.setSkSyukkoSihshikakuNm(
+                                shinTblDto.getSyukkoShokunoshikakuNm());
+                    }
+
+                    // 出向先メールアドレス
+                    if (KoseiStringUtils.isEmpty(shinTblDto.getShukkouSakiMail())) {
+                        // 社員テーブルが未設定、出向元の情報が設定されている場合
+                        if (syukkoMoto != null && !KoseiStringUtils
+                                .isEmpty(syukkoMoto.getShukkouSakiMail())) {
+                            /// 出向先メールアドレスを出向元の情報を設定
+                            gYCIdoJohoHDto.setSkShukkouSakiMail(
+                                    syukkoMoto.getShukkouSakiMail());
+                        }
+                    } else {
+                        gYCIdoJohoHDto
+                                .setSkShukkouSakiMail(shinTblDto.getShukkouSakiMail());
+                    }
+
+
+                } else if (syukkoMoto != null) {
+                    // 出向先会社コード
+                    if (!KoseiStringUtils.isEmpty(syukkoMoto.getSyukkosakiKaishaCd())) {
+                        // 出向元会社コードを出向元の情報を設定
+                        gYCIdoJohoHDto.setSkSyukkosakiKaishaCd(
+                                syukkoMoto.getSyukkosakiKaishaCd());
+                    }
+                    // 出向先会社名称(社員テーブルにカラムなし）
+                    if (!KoseiStringUtils.isEmpty(syukkoMoto.getSyukkosakiKaishaNm())) {
+                        // 出向先会社名称を出向元の情報を設定
+                        gYCIdoJohoHDto.setSkSyukkosakiKaishaNm(
+                                syukkoMoto.getSyukkosakiKaishaNm());
+                    }
+                    // 出向先組織コード
+                    if (!KoseiStringUtils.isEmpty(syukkoMoto.getSyukkosakiSoshikiCd())) {
+                        // 出向先組織コードを出向元の情報を設定
+                        gYCIdoJohoHDto.setSkSyukkosakiSoshikiCd(
+                                syukkoMoto.getSyukkosakiSoshikiCd());
+                    }
+                    // 出向先部課コード
+                    if (!KoseiStringUtils.isEmpty(syukkoMoto.getSyukkosakiBukaCd())) {
+                        // 出向先部課コードを出向元の情報を設定
+                        gYCIdoJohoHDto
+                                .setSkSyukkosakiBukaCd(syukkoMoto.getSyukkosakiBukaCd());
+                    }
+                    // 出向先社員区分コード
+                    if (!KoseiStringUtils.isEmpty(syukkoMoto.getSyukkosakiSihKbnCd())) {
+                        /// 出向先社員区分コードを出向元の情報を設定
+                        gYCIdoJohoHDto.setSkSyukkosakiSihKbnCd(
+                                syukkoMoto.getSyukkosakiSihKbnCd());
+                    }
+                    // 出向先在職区分コード
+                    if (!KoseiStringUtils
+                            .isEmpty(syukkoMoto.getSyukkosakiZaishokKbnCd())) {
+                        /// 出向先在職区分コードを出向元の情報を設定
+                        gYCIdoJohoHDto.setSkSyukkosakiZaishokKbnCd(
+                                syukkoMoto.getSyukkosakiZaishokKbnCd());
+                    }
+                    // 出向先社員資格
+                    if (!KoseiStringUtils.isEmpty(syukkoMoto.getSyukkoSihshikaku())) {
+                        /// 出向先社員資格を出向元の情報を設定
+                        gYCIdoJohoHDto
+                                .setSkSyukkoSihshikaku(syukkoMoto.getSyukkoSihshikaku());
+                    }
+                    // 出向先社員資格名
+                    if (!KoseiStringUtils.isEmpty(syukkoMoto.getSyukkoSihshikakuNm())) {
+                        /// 出向先社員資格名を出向元の情報を設定
+                        gYCIdoJohoHDto.setSkSyukkoSihshikakuNm(
+                                syukkoMoto.getSyukkoSihshikakuNm());
+                    }
+                    // 出向先メールアドレス
+                    if (!KoseiStringUtils.isEmpty(syukkoMoto.getShukkouSakiMail())) {
+                        /// 出向先メールアドレスを出向元の情報を設定
+                        gYCIdoJohoHDto
+                                .setSkShukkouSakiMail(syukkoMoto.getShukkouSakiMail());
+                    }
+                }
+
+
+            }
+
+
+        } else {
+            // ---------------------------------- 出向復帰
+            // ------------------------------------
+            // 以下 出向情報 出向復帰の情報を更新
+
+
+            // 給与支給等の初期化
+            if (syukkoMoto != null) {
+                // 給与支給会社コード
+                gYCIdoJohoHDto
+                        .setSfKyuyoSikyukaishaCd(syukkoMoto.getKyuyoSikyukaishaCd());
+                // 給与組織コード
+                gYCIdoJohoHDto
+                        .setSfKyuyoSikyusoshikiCd(syukkoMoto.getKyuyoSikyusoshikiCd());
+                // 給与部課コード
+                gYCIdoJohoHDto.setSfKyuyoSikyubukaCd(syukkoMoto.getKyuyoSikyubukaCd());
+
+            } else if (syukkoSaki != null) {
+                // 給与支給会社コード
+                gYCIdoJohoHDto
+                        .setSfKyuyoSikyukaishaCd(syukkoSaki.getKyuyoSikyukaishaCd());
+                // 給与組織コード
+                gYCIdoJohoHDto
+                        .setSfKyuyoSikyusoshikiCd(syukkoSaki.getKyuyoSikyusoshikiCd());
+                // 給与部課コード
+                gYCIdoJohoHDto.setSfKyuyoSikyubukaCd(syukkoSaki.getKyuyoSikyubukaCd());
+
+            }
+            // 社員テーブルがあれば、社員テーブルの値で上書き
+            if (shinTblDto != null) {
+                // 給与支給会社コード
+                if (!KoseiStringUtils.isEmpty(shinTblDto.getKyuyoSikyukaishaCd())) {
+                    gYCIdoJohoHDto
+                            .setSfKyuyoSikyukaishaCd(shinTblDto.getKyuyoSikyukaishaCd());
+                }
+                // 給与組織コード
+                if (!KoseiStringUtils.isEmpty(shinTblDto.getKyuyoSikyusoshikiCd())) {
+                    gYCIdoJohoHDto.setSfKyuyoSikyusoshikiCd(
+                            shinTblDto.getKyuyoSikyusoshikiCd());
+                }
+                // 給与部課コード
+                if (!KoseiStringUtils.isEmpty(shinTblDto.getKyuyoSikyubukaCd())) {
+                    gYCIdoJohoHDto
+                            .setSfKyuyoSikyubukaCd(shinTblDto.getKyuyoSikyubukaCd());
+                }
+            }
+
+
+
+            // 出向元が設定されてい場合
+            if (syukkoMoto != null) {
+                // 出向元会社コード
+                gYCIdoJohoHDto
+                        .setSfSyukkomotoKaishaCd(syukkoMoto.getSyukkomotoKaishaCd());
+                // 出向元組織コード
+                gYCIdoJohoHDto
+                        .setSfSyukkomotoSoshikiCd(syukkoMoto.getSyukkomotoSoshikiCd());
+
+            } else {
+                // 以下、出向元データが無い場合、社員テーブルが未設定の場合、出向先の設定値で更新する。
+                // 出向元会社コード（復帰の場合は社員テーブルに値が設定されているはず
+                gYCIdoJohoHDto
+                        .setSfSyukkomotoKaishaCd(shinTblDto.getSyukkomotoKaishaCd());
+
+                // 出向元組織コード
+                if (KoseiStringUtils.isEmpty(shinTblDto.getSyukkomotoSoshikiCd())) {
+                    // 社員テーブルが未設定、出向先の情報が設定されている場合
+                    if (syukkoSaki != null && !KoseiStringUtils
+                            .isEmpty(syukkoSaki.getSyukkomotoSoshikiCd())) {
+                        // 出向元組織コードを出向先の情報を設定
+                        gYCIdoJohoHDto.setSfSyukkomotoSoshikiCd(
+                                syukkoSaki.getSyukkomotoSoshikiCd());
+                    }
+                } else {
+                    gYCIdoJohoHDto.setSfSyukkomotoSoshikiCd(
+                            shinTblDto.getSyukkomotoSoshikiCd());
+                }
+            }
+
+
+            if (syukkoMoto != null) {
+                if (!ZAI_A.equals(syukkoMoto.getSyukkoSbt())) {
+                    // 給与支給会社コード
+                    gYCIdoJohoHDto
+                            .setSfKyuyoSikyukaishaCd(syukkoMoto.getKyuyoSikyukaishaCd());
+                    // 給与組織コード
+                    gYCIdoJohoHDto.setSfKyuyoSikyusoshikiCd(
+                            syukkoMoto.getKyuyoSikyusoshikiCd());
+                    // 給与部課コード
+                    gYCIdoJohoHDto
+                            .setSfKyuyoSikyubukaCd(syukkoMoto.getKyuyoSikyubukaCd());
+                }
+            }
+            if (syukkoSaki != null) {
+                if (ZAI_A.equals(syukkoSaki.getSyukkoSbt())) {
+                    // 給与支給会社コード
+                    gYCIdoJohoHDto
+                            .setSfKyuyoSikyukaishaCd(syukkoSaki.getKyuyoSikyukaishaCd());
+                    // 給与組織コード
+                    gYCIdoJohoHDto.setSfKyuyoSikyusoshikiCd(
+                            syukkoSaki.getKyuyoSikyusoshikiCd());
+                    // 給与部課コード
+                    gYCIdoJohoHDto
+                            .setSfKyuyoSikyubukaCd(syukkoSaki.getKyuyoSikyubukaCd());
+                }
+            }
+
+
+            if (syukkoSaki != null) {
+                // 出向先会社コード
+                gYCIdoJohoHDto
+                        .setSfSyukkosakiKaishaCd(syukkoSaki.getSyukkosakiKaishaCd());
+                // 出向先会社名称
+                gYCIdoJohoHDto
+                        .setSfSyukkosakiKaishaNm(syukkoSaki.getSyukkosakiKaishaNm());
+                // 出向先組織コード
+                gYCIdoJohoHDto
+                        .setSfSyukkosakiSoshikiCd(syukkoSaki.getSyukkosakiSoshikiCd());
+                // 出向先部課コード
+                gYCIdoJohoHDto.setSfSyukkosakiBukaCd(syukkoSaki.getSyukkosakiBukaCd());
+                // 出向先社員区分コード
+                gYCIdoJohoHDto
+                        .setSfSyukkosakiSihKbnCd(syukkoSaki.getSyukkosakiSihKbnCd());
+                // 出向先在職区分コード
+                gYCIdoJohoHDto.setSfSyukkosakiZaishokKbnCd(
+                        syukkoSaki.getSyukkosakiZaishokKbnCd());
+                // 出向先社員資格
+                gYCIdoJohoHDto.setSfSyukkoSihshikaku(syukkoSaki.getSyukkoSihshikaku());
+                // 出向先社員資格名称
+                gYCIdoJohoHDto
+                        .setSfSyukkoSihshikakuNm(syukkoSaki.getSyukkoSihshikakuNm());
+                // 出向先メールアドレス
+                gYCIdoJohoHDto.setSfShukkouSakiMail(syukkoSaki.getShukkouSakiMail());
+            } else {
+                // 以下、出向先データが無い場合、社員テーブルが未設定の場合、出向元の設定値で更新する。
+                gYCIdoJohoHDto
+                        .setSfSyukkosakiKaishaCd(shinTblDto.getSyukkosakiKaishaCd());
+
+                // 出向先会社名称(社員テーブルにカラムなし）
+                // 出向元の情報が設定されている場合
+                if (syukkoMoto != null && !KoseiStringUtils
+                        .isEmpty(syukkoMoto.getSyukkosakiKaishaNm())) {
+                    // 出向先会社名称を出向元の情報を設定
+                    gYCIdoJohoHDto
+                            .setSfSyukkosakiKaishaNm(syukkoMoto.getSyukkosakiKaishaNm());
+                }
+
+                // 出向先組織コード
+                if (KoseiStringUtils.isEmpty(shinTblDto.getSyukkosakiSoshikiCd())) {
+                    // 社員テーブルが未設定、出向元の情報が設定されている場合
+                    if (syukkoMoto != null && !KoseiStringUtils
+                            .isEmpty(syukkoMoto.getSyukkosakiSoshikiCd())) {
+                        // 出向先組織コードを出向元の情報を設定
+                        gYCIdoJohoHDto.setSfSyukkosakiSoshikiCd(
+                                syukkoMoto.getSyukkosakiSoshikiCd());
+                    }
+                } else {
+                    // 社員テーブルの値を設定
+                    gYCIdoJohoHDto.setSfSyukkosakiSoshikiCd(
+                            shinTblDto.getSyukkosakiSoshikiCd());
+                }
+
+                // 出向先部課コード
+                if (KoseiStringUtils.isEmpty(shinTblDto.getSyukkosakiBukaCd())) {
+                    // 社員テーブルが未設定、出向元の情報が設定されている場合
+                    if (syukkoMoto != null && !KoseiStringUtils
+                            .isEmpty(syukkoMoto.getSyukkosakiBukaCd())) {
+                        // 出向先部課コードを出向元の情報を設定
+                        gYCIdoJohoHDto
+                                .setSfSyukkosakiBukaCd(syukkoMoto.getSyukkosakiBukaCd());
+                    }
+                } else {
+                    // 社員テーブルの値を設定
+                    gYCIdoJohoHDto
+                            .setSfSyukkosakiBukaCd(shinTblDto.getSyukkosakiBukaCd());
+                }
+
+                // 出向先社員区分コード
+                if (KoseiStringUtils.isEmpty(shinTblDto.getSyukkosakiSihKbnCd())) {
+                    // 社員テーブルが未設定、出向元の情報が設定されている場合
+                    if (syukkoMoto != null && !KoseiStringUtils
+                            .isEmpty(syukkoMoto.getSyukkosakiSihKbnCd())) {
+                        /// 出向先社員区分コードを出向元の情報を設定
+                        gYCIdoJohoHDto.setSfSyukkosakiSihKbnCd(
+                                syukkoMoto.getSyukkosakiSihKbnCd());
+                    }
+                } else {
+                    gYCIdoJohoHDto
+                            .setSfSyukkosakiSihKbnCd(shinTblDto.getSyukkosakiSihKbnCd());
+                }
+
+                // 出向先在職区分コード
+                if (KoseiStringUtils.isEmpty(shinTblDto.getSyukkosakiZaishokKbnCd())) {
+                    // 社員テーブルが未設定、出向元の情報が設定されている場合
+                    if (syukkoMoto != null && !KoseiStringUtils
+                            .isEmpty(syukkoMoto.getSyukkosakiZaishokKbnCd())) {
+                        /// 出向先在職区分コードを出向元の情報を設定
+                        gYCIdoJohoHDto.setSfSyukkosakiZaishokKbnCd(
+                                syukkoMoto.getSyukkosakiZaishokKbnCd());
+                    }
+                } else {
+                    gYCIdoJohoHDto.setSfSyukkosakiZaishokKbnCd(
+                            shinTblDto.getSyukkosakiZaishokKbnCd());
+                }
+
+                // 出向先社員資格
+                if (KoseiStringUtils.isEmpty(shinTblDto.getSyukkoSihshikaku())) {
+                    // 社員テーブルが未設定、出向元の情報が設定されている場合
+                    if (syukkoMoto != null && !KoseiStringUtils
+                            .isEmpty(syukkoMoto.getSyukkoSihshikaku())) {
+                        /// 出向先社員資格を出向元の情報を設定
+                        gYCIdoJohoHDto
+                                .setSfSyukkoSihshikaku(syukkoMoto.getSyukkoSihshikaku());
+                    }
+                } else {
+                    gYCIdoJohoHDto
+                            .setSfSyukkoSihshikaku(shinTblDto.getSyukkoSihshikaku());
+                }
+
+                // 出向先社員資格名
+                if (KoseiStringUtils.isEmpty(shinTblDto.getSyukkoShokunoshikakuNm())) {
+                    // 社員テーブルが未設定、出向元の情報が設定されている場合
+                    if (syukkoMoto != null && !KoseiStringUtils
+                            .isEmpty(syukkoMoto.getSyukkoSihshikakuNm())) {
+                        /// 出向先社員資格名を出向元の情報を設定
+                        gYCIdoJohoHDto.setSfSyukkoSihshikakuNm(
+                                syukkoMoto.getSyukkoSihshikakuNm());
+                    }
+                } else {
+                    gYCIdoJohoHDto.setSfSyukkoSihshikakuNm(
+                            shinTblDto.getSyukkoShokunoshikakuNm());
+                }
+
+                // 出向先メールアドレス
+                if (KoseiStringUtils.isEmpty(shinTblDto.getShukkouSakiMail())) {
+                    // 社員テーブルが未設定、出向元の情報が設定されている場合
+                    if (syukkoMoto != null && !KoseiStringUtils
+                            .isEmpty(syukkoMoto.getShukkouSakiMail())) {
+                        /// 出向先メールアドレスを出向元の情報を設定
+                        gYCIdoJohoHDto
+                                .setSfShukkouSakiMail(syukkoMoto.getShukkouSakiMail());
+                    }
+                } else {
+                    gYCIdoJohoHDto.setSfShukkouSakiMail(shinTblDto.getShukkouSakiMail());
+                }
+
+            }
+
+        }
+    }
+
+
+    /**
+     * <p>[概 要] doIdoJohoErrOut メソッド。</p>
+     * <p>[詳 細] 異動情報エラー情報出力処理</p>
+     * <p>[備 考] </p>
+     *
+     * @param gYC08IdoJohoCDto 人事異動情報
+     * @param msgWDto 人事異動情報メッセージワーク
+     */
+    private void doIdoJohoErrOut(GYC08IdoJohoCDto gYC08IdoJohoCDto,
+            GYCIdoJohoMsgWDto msgWDto) {
+        // エラー情報に情報をコピーする。
+        this.mapper.map(gYC08IdoJohoCDto, msgWDto);
+        // その他の項目設定
+        msgWDto.setJobId(this.functionId);
+        if (!KoseiStringUtils.isEmpty(msgWDto.getErrMsgId())
+                && msgWDto.getErrMsgId().length() == 9) {
+            msgWDto.setErrLevel(msgWDto.getErrMsgId().substring(5, 6));
+        }
+        msgWDto.setCreateUserId(gYC08IdoJohoCDto.getOperUserId());
+        msgWDto.setLastUpdateUserId(gYC08IdoJohoCDto.getOperUserId());
+
+        GYC08IdoJohoMsgWErrFileDto msgWFileDto = new GYC08IdoJohoMsgWErrFileDto();
+        // エラー情報に情報をコピーする。
+        this.mapper.map(msgWDto, msgWFileDto);
+
+        // 人事システムコード(和名変換）
+        Map<String, String> jsysCodeMap = jsysCodeList.asMap();
+        if (!jsysCodeMap.containsKey(gYC08IdoJohoCDto.getJsysSbtCd())) {
+            if (GYCIdoJohoConst.JSYS_SONOTA.equals(gYC08IdoJohoCDto.getJsysSbtCd())) {
+                msgWFileDto.setJsysSbtCd(JSYS_SONOT_NM);
+            } else {
+                msgWFileDto.setJsysSbtCd(gYC08IdoJohoCDto.getJsysSbtCd());
+            }
+        } else {
+            msgWFileDto.setJsysSbtCd(jsysCodeMap.get(gYC08IdoJohoCDto.getJsysSbtCd()));
+        }
+
+        // ファイルへデータを出力
+        msgWFileDto.setErrMsg("\"" + msgWFileDto.getErrMsg() + "\"");
+        msgWFileDto.setNameCd("\"" + msgWFileDto.getNameCd() + "\"");
+        if (!KoseiStringUtils.isEmpty(msgWFileDto.getIdohasseinengappi())) {
+            msgWFileDto.setIdohasseinengappi(
+                    msgWFileDto.getIdohasseinengappi().replace("-", "/"));
+        }
+        msgWFileDto
+                .setIdohasseinengappi("\"" + msgWFileDto.getIdohasseinengappi() + "\"");
+        msgWFileDto.setJsysSbtCd("\"" + msgWFileDto.getJsysSbtCd() + "\"");
+        msgWFileDto.setIdofilegyoNo("\"" + msgWFileDto.getIdofilegyoNo() + "\"");
+
+        errlistFileLineWriter.writeData(msgWFileDto);
+
+        // 人事異動情報メッセージワークへ登録する。
+        this.gyc08Dao.insertIdoJohoMsgW(msgWDto);
+
+        // 有効フラグに無効を設定
+        gYC08IdoJohoCDto.setYukoRecFlg(MUKO);
+
+        // Logにエラーメッセージを出力
+        this.klogger.error("【 エラー処理 】 ErrMsgId:{}  ErrMsg:{}", msgWDto.getErrMsgId(),
+                msgWDto.getErrMsg());
+
+    }
+
+
+    /**
+     * <p>[概 要] doIdoJohoErrOut2 メソッド。</p>
+     * <p>[詳 細] 異動情報エラー情報出力処理２（複数の異動情報）</p>
+     * <p>[備 考] </p>
+     *
+     * @param gYC08IdoJohoHPDto 異動情報振分前ＤＴＯ
+     * @param msgWDto 異動情報メッセージワークDTO
+     */
+    private void doIdoJohoErrOut2(GYC08IdoJohoHPDto gYC08IdoJohoHPDto,
+            GYCIdoJohoMsgWDto msgWDto) {
+
+        msgWDto.setJobId(this.functionId);
+        msgWDto.setCreateUserId(gYC08IdoJohoHPDto.getCreateUserId());
+        msgWDto.setLastUpdateUserId(gYC08IdoJohoHPDto.getLastUpdateUserId());
+
+        msgWDto.setNameCd(gYC08IdoJohoHPDto.getNameCd());
+        msgWDto.setIdohasseinengappi(gYC08IdoJohoHPDto.getIdohasseinengappi());
+        if (!KoseiStringUtils.isEmpty(msgWDto.getErrMsgId())
+                && msgWDto.getErrMsgId().length() == 9) {
+            msgWDto.setErrLevel(msgWDto.getErrMsgId().substring(5, 6));
+        }
+
+        Map<String, String> jsysCodeMap = jsysCodeList.asMap();
+        int errorCnt = 0;
+        Iterator<GYC08IdoJohoCDto> itr =
+                gYC08IdoJohoHPDto.getLstGYC08IdoJohoCDto().iterator();
+        while (itr.hasNext()) {
+            // 人事異動情報を取得する。
+            GYC08IdoJohoCDto dto = (GYC08IdoJohoCDto) itr.next();
+            msgWDto.setJinjiidojyh(dto.getJinjiidojyh());
+            msgWDto.setJsysSbtCd(dto.getJsysSbtCd());
+            msgWDto.setIdoSbtCd(dto.getIdoSbtCd());
+            msgWDto.setIdofilegyoNo(dto.getIdofilegyoNo());
+
+            GYC08IdoJohoMsgWErrFileDto msgWFileDto = new GYC08IdoJohoMsgWErrFileDto();
+            // エラー情報に情報をコピーする。
+            this.mapper.map(msgWDto, msgWFileDto);
+
+            // 人事システムコード(和名変換）
+            if (!jsysCodeMap.containsKey(dto.getJsysSbtCd())) {
+                if (GYCIdoJohoConst.JSYS_SONOTA.equals(dto.getJsysSbtCd())) {
+                    msgWFileDto.setJsysSbtCd(JSYS_SONOT_NM);
+                } else {
+                    msgWFileDto.setJsysSbtCd(dto.getJsysSbtCd());
+                }
+            } else {
+                msgWFileDto.setJsysSbtCd(jsysCodeMap.get(dto.getJsysSbtCd()));
+            }
+
+            // ファイルへデータを出力
+            msgWFileDto.setErrMsg("\"" + msgWFileDto.getErrMsg() + "\"");
+            msgWFileDto.setNameCd("\"" + msgWFileDto.getNameCd() + "\"");
+            if (!KoseiStringUtils.isEmpty(msgWFileDto.getIdohasseinengappi())) {
+                msgWFileDto.setIdohasseinengappi(
+                        msgWFileDto.getIdohasseinengappi().replace("-", "/"));
+            }
+            msgWFileDto.setIdohasseinengappi(
+                    "\"" + msgWFileDto.getIdohasseinengappi() + "\"");
+            msgWFileDto.setJsysSbtCd("\"" + msgWFileDto.getJsysSbtCd() + "\"");
+            msgWFileDto.setIdofilegyoNo("\"" + msgWFileDto.getIdofilegyoNo() + "\"");
+
+            errlistFileLineWriter.writeData(msgWFileDto);
+
+            // 人事異動情報メッセージワークへ登録する。
+            this.gyc08Dao.insertIdoJohoMsgW(msgWDto);
+
+            errorCnt++;
+
+        }
+        gYC08IdoJohoHPDto.setErrorCnt(errorCnt);
+
+        this.klogger.error("【 エラー処理 】 ErrMsgId:{}  ErrMsg:{}", msgWDto.getErrMsgId(),
+                msgWDto.getErrMsg());
+
+    }
+
+    //
+    // /**
+    // * <p>[概 要] doIdoJohoWrnOut メソッド。</p>
+    // * <p>[詳 細] 警告情報出力</p>
+    // * <p>[備 考] </p>
+    // *
+    // * @param gYC08IdoJohoCDto 人事異動情報
+    // * @param idoJohoDtoAbst 異動情報抽象クラス
+    // */
+    // private void doIdoJohoWrnOut(GYC08IdoJohoCDto gYC08IdoJohoCDto,
+    // GYCIdoJohoDtoAbst idoJohoDtoAbst) {
+    //
+    // Map<String, String> jsysCodeMap = jsysCodeList.asMap();
+    //
+    // for(int i= 0; i < idoJohoDtoAbst.getLstWrnMsg().size(); ++i) {
+    // GYCIdoJohoMsgWDto msgWDto = new
+    // GYCIdoJohoMsgWDto(idoJohoDtoAbst.getLstWrnMsgID().get(i),
+    // idoJohoDtoAbst.getLstWrnMsg().get(i));
+    // msgWDto.setJobId(this.functionId);
+    // if (!KoseiStringUtils.isEmpty(msgWDto.getErrMsgId()) &&
+    // msgWDto.getErrMsgId().length() == 9) {
+    // msgWDto.setErrLevel(msgWDto.getErrMsgId().substring(5, 6));
+    // }
+    // this.mapper.map(gYC08IdoJohoCDto, msgWDto);
+    // msgWDto.setCreateUserId(gYC08IdoJohoCDto.getOperUserId());
+    // msgWDto.setLastUpdateUserId(gYC08IdoJohoCDto.getOperUserId());
+    //
+    //
+    // GYC08IdoJohoMsgWRstFileDto msgWFileDto = new GYC08IdoJohoMsgWRstFileDto();
+    // // エラー情報に情報をコピーする。
+    // this.mapper.map(msgWDto, msgWFileDto);
+    //
+    // // 人事システムコード(和名変換）
+    // if (!jsysCodeMap.containsKey(gYC08IdoJohoCDto.getJsysSbtCd())) {
+    // if (GYCIdoJohoConst.JSYS_SONOTA.equals(gYC08IdoJohoCDto.getJsysSbtCd())) {
+    // msgWFileDto.setJsysSbtCd(JSYS_SONOT_NM);
+    // }else {
+    // msgWFileDto.setJsysSbtCd(gYC08IdoJohoCDto.getJsysSbtCd());
+    // }
+    // }else {
+    // msgWFileDto.setJsysSbtCd(jsysCodeMap.get(gYC08IdoJohoCDto.getJsysSbtCd()));
+    // }
+    // // ファイルへデータを出力
+    // rstlistFileLineWriter.printDataLine(msgWFileDto);
+    // // 警告メッセージ出力
+    // this.klogger.warning(msgWFileDto.getErrMsg(), null);
+    //
+    // // 人事異動情報メッセージワークへ登録する。
+    // this.gyc08Dao.insertIdoJohoMsgW(msgWDto);
+    //
+    // }
+    // }
+
+    /**
+     * <p>[概 要] createTrailer メソッド。</p>
+     * <p>[詳 細] 処理結果リスト・エラーリストのトレーラーを作成する</p>
+     * <p>[備 考] </p>
+     *
+     * @param inputCnt 入力件数
+     * @param normalCnt 登録件数
+     * @param errorCnt エラー件数
+     * @param userId ユーザID
+     */
+    private void createTrailer(int inputCnt, int normalCnt, int errorCnt, String userId) {
+
+        // 入力ファイル名
+        StringBuffer sbInputFileNm = new StringBuffer();
+        List<String> setsuzokufileList = this.gYCIdoJohoDao.findListSetsuzokufile();
+        for (String setsuzokufile : setsuzokufileList) {
+            sbInputFileNm.append(setsuzokufile).append(";");
+        }
+        String inputFileNm = sbInputFileNm.toString();
+        if (inputFileNm.length() > 1) {
+            inputFileNm = inputFileNm.substring(0, inputFileNm.length() - 1);
+        }
+
+        String trailerLine = "入力ファイル:%s 入力件数:%s件 登録件数:%s件 エラー件数:%s件 処理日時:%s 氏名コード:%s".formatted(
+            inputFileNm,
+            inputCnt,
+            normalCnt,
+            errorCnt,
+            dateFactory.newLocalDateTime().format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm")),
+            userId
+        );
+        // トレーラレコード作成
+        rstlistFileLineWriter.writeBlankLine();
+        rstlistFileLineWriter.writeFooter(trailerLine);
+        errlistFileLineWriter.writeBlankLine();
+        errlistFileLineWriter.writeFooter(trailerLine);
+
+        this.klogger.debug("トレーラーレコード：{}", trailerLine);
+
+    }
+
+
+    /**
+     * 
+     * <p>[概 要] 人事異動情報振分ファイル名取得メソッド。</p>
+     * <p>[詳 細] 人事異動情報振分のファイル名を作成する。</p>
+     * <p>[備 考] </p>
+     *
+     * @param functionId ユーザID／機能ID
+     * @param cycleNo サイクル番号
+     * @param gymHizuke 業務日付
+     * @return エラーリストのファイル名
+     */
+    private static String getIdoJohoFuriFileName(String functionId, String cycleNo,
+            String gymHizuke) {
+
+        // エラーリスト接尾辞
+        String errorlistSuffix = "_" + cycleNo + "_";
+
+        // エラーリスト拡張子
+        String errorlistExtension = KoseiProperties.get(ERROR_LIST_SUFFIX_PROP_KEY)
+                .orElseThrow(() -> new KoseiSystemException(
+                        "Property key is not found " + ERROR_LIST_SUFFIX_PROP_KEY));
+
+        return functionId + errorlistSuffix + gymHizuke + errorlistExtension;
+    }
+
+
+
+    /**
+     * <p>[概 要] doOutputWarningMsg メソッド。</p>
+     * <p>[詳 細] 警告出力処理</p>
+     * <p>[備 考] </p>
+     *
+     * @param cDto 抽出ワーク
+     * @param msg メッセージID
+     */
+    private void doOutputWarningMsg(GYC08IdoJohoCDto cDto, GYC08MessageId msg) {
+
+        String warnMsg =
+                MessageFormat.format(this.messageAccessor.getText(msg), cDto.getNameCd());
+        GYCIdoJohoMsgWDto warnDto = new GYCIdoJohoMsgWDto(msg.toString(), warnMsg);
+        warnDto.setNameCd(cDto.getNameCd());
+        warnDto.setIdohasseinengappi(cDto.getIdohasseinengappi());
+        warnDto.setJsysSbtCd(cDto.getJsysSbtCd());
+        warnDto.setIdofilegyoNo(cDto.getIdofilegyoNo());
+        warnDto.setIdoSbtCd(cDto.getIdoSbtCd());
+        warnDto.setErrLevel("W");
+        warnDto.setJobId(functionId);
+        warnDto.setCreateUserId(cDto.getOperUserId());
+        warnDto.setLastUpdateUserId(cDto.getOperUserId());
+        // ワーニングメッセージを出力 ⇒ 実際にファイルに出力されるのはGYC05の処理結果リスト
+        this.gyc08Dao.insertIdoJohoMsgW(warnDto);
+
+    }
+
+
+
+}
