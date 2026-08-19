@@ -1,0 +1,411 @@
+package jp.co.nttcom.kosei.batch.gy.gyc08;
+
+import jp.co.nttcom.kosei.batch.common.gy.gyc.GYCIdoJohoConst;
+import jp.co.nttcom.kosei.batch.common.gy.gyc.GYCIdoJohoDtoAbst;
+import jp.co.nttcom.kosei.batch.common.gy.gyc.GYCIdoJohoFactory;
+import jp.co.nttcom.kosei.batch.common.gy.gyc.GYCIdoJohoSinJyhDto;
+import jp.co.nttcom.kosei.common.ss.util.KoseiDateFactory;
+import jp.co.nttcom.kosei.common.ss.util.KoseiStringUtils;
+
+import org.springframework.stereotype.Component;
+
+import java.text.MessageFormat;
+import java.time.LocalDate;
+import java.util.Map;
+
+import jakarta.inject.Inject;
+
+/**
+ * <p>[概 要] GYCIdoJohoSinJyhProc クラス。</p>
+ * <p>[詳 細] 人事異動情報　社員情報の処理クラス</p>
+ * <p>[備 考] </p>
+ * <p>[環 境] JRE 21</p>
+ * <p>Copyright © NTT DOCOMO SOLUTIONS, Inc.</p>
+ * @author ビジネストランスフォーメーション本部 コーポレートビジネスソリューション部
+ */
+@Component
+public class GYC08IdoJohoSinJyhProc extends GYC08IdoJohoFileProcAbst {
+    
+    
+    /**
+     * 日付操作オブジェクト（インジェクト）
+     */
+    @Inject
+    private KoseiDateFactory dateFactory;
+    
+    /**
+     * 全角SP
+     */
+    private static final String FULL_SPACE = "　";
+   
+    /**
+     * 戻り値（正常）
+     */
+    private static final int OK = 0;
+ 
+    /**
+     * 戻り値（異常）
+     */
+    private static final int NG = -1;
+    
+    
+    
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public GYCIdoJohoDtoAbst createIdoJohoDTO(GYC08IdoJohoCDto gYC08IdoJohoCDto) {
+        
+        // 社員情報で作成
+        GYCIdoJohoDtoAbst idoDto = GYCIdoJohoFactory.createIdoJoho(gYC08IdoJohoCDto.getJsysSbtCd(), GYCIdoJohoConst.SBT_SHAIN, gYC08IdoJohoCDto.getJinjiidojyh());
+
+        return idoDto;
+    }
+
+    
+    
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public GYC08MessageId furiwakeValidate(GYCIdoJohoDtoAbst idoDto) {
+        
+        // キャスト
+        GYCIdoJohoSinJyhDto gYCIdoJohoSinJyhDto = (GYCIdoJohoSinJyhDto)idoDto;
+        
+        LocalDate chkNengappi;
+        GYC08MessageId rtnMessage = null;
+        String errMsg;
+        
+        // 処理種別表示が削除の場合、処理を行わない。
+        if (GYCIdoJohoConst.SHORISBT_DEL.equals(gYCIdoJohoSinJyhDto.getSShoriSbtHyoji())) {
+            return GYC08MessageId.GYC08I000;
+        }
+        
+        // ====== 日付型チェック ======
+        //生年月日チェック
+        if(!KoseiStringUtils.isEmpty(gYCIdoJohoSinJyhDto.getSSeinengappiWk())) {
+            chkNengappi = dateChk(gYCIdoJohoSinJyhDto.getSSeinengappiWk());
+            if (chkNengappi != null && !chkNengappi.isAfter(idoDto.getGymHizuke())) {
+                // LocalDate型で格納
+                gYCIdoJohoSinJyhDto.setSSeinengappi(chkNengappi);
+            }else {
+                // エラーメッセージ作成
+                errMsg = MessageFormat.format(this.messageAccessor.getText(GYC08MessageId.GYC08E001), idoDto.getNameCd(), gYCIdoJohoSinJyhDto.getSSeinengappiWk());
+                idoDto.setErrMsg(errMsg);
+                // エラーコードを返却
+                return GYC08MessageId.GYC08E001;
+            }            
+        }
+        //採用年月日チェック
+        if(!KoseiStringUtils.isEmpty(gYCIdoJohoSinJyhDto.getSSaiyouDtWk())) {
+            chkNengappi = dateChk(gYCIdoJohoSinJyhDto.getSSaiyouDtWk());
+            if (chkNengappi != null && !chkNengappi.isAfter(idoDto.getGymHizuke())) {
+                // LocalDate型で格納
+                gYCIdoJohoSinJyhDto.setSSaiyouDt(chkNengappi);
+            }else {
+                // エラーメッセージ作成
+                errMsg = MessageFormat.format(this.messageAccessor.getText(GYC08MessageId.GYC08E002), idoDto.getNameCd(), gYCIdoJohoSinJyhDto.getSSaiyouDtWk());
+                idoDto.setErrMsg(errMsg);
+                // エラーコードを返却
+                return GYC08MessageId.GYC08E002;
+            }            
+        }
+        //転居年月日チェック
+        if(!KoseiStringUtils.isEmpty(gYCIdoJohoSinJyhDto.getSTenkyoDtWk())) {
+            chkNengappi = dateChk(gYCIdoJohoSinJyhDto.getSTenkyoDtWk());
+            if (chkNengappi != null && !chkNengappi.isAfter(idoDto.getGymHizuke())) {
+                // LocalDate型で格納
+                gYCIdoJohoSinJyhDto.setSTenkyoDt(chkNengappi);
+            }else {
+                rtnMessage = GYC08MessageId.GYC08E008;
+                // エラーメッセージ作成
+                errMsg = MessageFormat.format(this.messageAccessor.getText(rtnMessage), idoDto.getNameCd(), gYCIdoJohoSinJyhDto.getSTenkyoDtWk());
+                idoDto.setErrMsg(errMsg);
+                // エラーコードを返却
+                return rtnMessage;
+            }            
+        }
+        
+        // ===== 人給別必須項目チェック =====
+        // 社員資格チェック   INFOGRID以外(SPEAD,COM)は社員資格は必須
+        if(!GYCIdoJohoConst.JSYS_INFOGRID.equals(gYCIdoJohoSinJyhDto.getSJsysSbtCd())) {
+            if(KoseiStringUtils.isEmpty(gYCIdoJohoSinJyhDto.getSSihshikaku())) {
+                rtnMessage = GYC08MessageId.GYC08E005;
+                // エラーメッセージ作成
+                errMsg = MessageFormat.format(this.messageAccessor.getText(rtnMessage), idoDto.getNameCd());
+                idoDto.setErrMsg(errMsg);
+                // エラーコードを返却
+                return rtnMessage;
+            }
+        }
+        // 社員資格名称チェック  INFOGRID以外(SPEAD,COM)は社員資格名称は必須
+        if(!GYCIdoJohoConst.JSYS_INFOGRID.equals(gYCIdoJohoSinJyhDto.getSJsysSbtCd())) {
+            if(KoseiStringUtils.isEmpty(gYCIdoJohoSinJyhDto.getSSihshikakuNm())) {
+                rtnMessage = GYC08MessageId.GYC08E006;
+                // エラーメッセージ作成
+                errMsg = MessageFormat.format(this.messageAccessor.getText(rtnMessage), idoDto.getNameCd());
+                idoDto.setErrMsg(errMsg);
+                // エラーコードを返却
+                return rtnMessage;
+            }
+        }
+
+        //エラーなし
+        return GYC08MessageId.GYC08I000;
+    }
+
+    
+    /**
+     * <p>[概 要] shimeiKanjiChk メソッド。</p>
+     * <p>[詳 細] 氏名漢字チェック</p>
+     * <p>[備 考] </p>
+     *
+     * @param chkData チェック文字列
+     * @return チェック結果
+     */
+    private int shimeiKanjiChk(String chkData) {
+        
+        if(!KoseiStringUtils.isEmpty(chkData)) {
+            // 全角文字チェック
+            if(KoseiStringUtils.isFullWidth(chkData)) {
+                // 全角ＳＰチェック
+                if(chkData.substring(0, 1).equals(FULL_SPACE)) {
+                    if(!KoseiStringUtils.isEmpty(KoseiStringUtils.ltrim(chkData, FULL_SPACE))){
+                        // エラー
+                        return NG;
+                    }
+                }
+            }else {
+                // エラー
+                return NG;
+            }
+        }
+        
+        return OK;
+    }
+  
+    
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public GYC08MessageId codeChg(GYCIdoJohoDtoAbst idoDto,Map<String, String> jsysCodeChgMap,
+            Map<String, String> kaishaCodeChgMap, Map<String, String> sihKbnMap) {
+        
+        String afterCode;
+        GYC08MessageId rtnMessage = null;
+        String errMsg;
+        
+        // キャスト
+        GYCIdoJohoSinJyhDto gYCIdoJohoSinJyhDto = (GYCIdoJohoSinJyhDto)idoDto;
+
+        
+        // 処理種別表示が削除の場合、処理を行わない。
+        if (GYCIdoJohoConst.SHORISBT_DEL.equals(gYCIdoJohoSinJyhDto.getSShoriSbtHyoji())) {
+            return GYC08MessageId.GYC08I000;
+        }
+        
+        //GY139:社員区分コード
+        if (!KoseiStringUtils.isEmpty(gYCIdoJohoSinJyhDto.getSSihKbnCd())) {
+
+            // 人事システム種別コード
+            String jsysSbtCd = gYCIdoJohoSinJyhDto.getSJsysSbtCd();
+            
+            // 人事システム種別コードがSPEAD、またはCOM人給の場合、社員区分変換マスタを使用した
+            // 社員区分の変換を行う。それ以外の場合は、既存の変換を行う。
+            if (checkForExchangeSihKbn(jsysSbtCd)) {
+                // 会社コード
+                String kaishaCd = gYCIdoJohoSinJyhDto.getSKaishaCd();
+                // 変換前社員区分コード
+                String beforeCode = gYCIdoJohoSinJyhDto.getSSihKbnCd();
+                
+                afterCode = exchangeSihKbn(sihKbnMap, jsysSbtCd, kaishaCd ,beforeCode);
+                
+                rtnMessage = GYC08MessageId.GYC08E061;
+                errMsg = MessageFormat.format(this.messageAccessor.getText(rtnMessage),
+                        idoDto.getNameCd(), kaishaCd, beforeCode);
+            } 
+            // 既存の変換処理
+            else {
+                
+                afterCode = codeChkUtil(jsysCodeChgMap,GYCIdoJohoConst.TOUITSUCD_SIHKBNCD, gYCIdoJohoSinJyhDto.getSJsysSbtCd(), gYCIdoJohoSinJyhDto.getSSihKbnCd());
+                
+                rtnMessage = GYC08MessageId.GYC08E036;
+                errMsg = MessageFormat.format(this.messageAccessor.getText(rtnMessage), idoDto.getNameCd(), gYCIdoJohoSinJyhDto.getSSihKbnCd());
+            }
+            
+            if (afterCode != null) {
+                // 変換後のコードに置き換える。
+                gYCIdoJohoSinJyhDto.setSSihKbnCd(afterCode);
+                // メッセージID、エラーメッセージを初期化する。
+                rtnMessage = null;
+                errMsg = null;
+            } else {
+                // 先に作成したエラーメッセージを設定する。
+                idoDto.setErrMsg(errMsg);
+                // エラーコードを返却
+                return rtnMessage;
+            }
+        }
+
+        //GY008:管一コード
+        if (!KoseiStringUtils.isEmpty(gYCIdoJohoSinJyhDto.getSKanitsuCd())) {
+            afterCode = codeChkUtil(jsysCodeChgMap,GYCIdoJohoConst.TOUITSUCD_KANITSUCD, gYCIdoJohoSinJyhDto.getSJsysSbtCd(), gYCIdoJohoSinJyhDto.getSKanitsuCd());
+            if (afterCode != null) {
+                // 変換後のコードに置き換える。
+                gYCIdoJohoSinJyhDto.setSKanitsuCd(afterCode);
+            } else {
+                rtnMessage = GYC08MessageId.GYC08E037;
+
+                // エラーメッセージ作成
+                errMsg = MessageFormat.format(this.messageAccessor.getText(rtnMessage), idoDto.getNameCd(), gYCIdoJohoSinJyhDto.getSKanitsuCd());
+                idoDto.setErrMsg(errMsg);
+                // エラーコードを返却
+                return rtnMessage;
+            }
+        }
+        
+        //GY016:異動要因コード
+        if (!KoseiStringUtils.isEmpty(gYCIdoJohoSinJyhDto.getSIdoCd())) {
+            // 変換前の異動要因コードを使用する必要があるので、保持。
+            gYCIdoJohoSinJyhDto.setsIdoCdBak(gYCIdoJohoSinJyhDto.getSIdoCd());
+            afterCode = codeChkUtil(jsysCodeChgMap,GYCIdoJohoConst.TOUITSUCD_IDOSBTCD, gYCIdoJohoSinJyhDto.getSJsysSbtCd(), gYCIdoJohoSinJyhDto.getSIdoCd());
+            if (afterCode != null) {
+                // 変換後のコードに置き換える。
+                gYCIdoJohoSinJyhDto.setSIdoCd(afterCode);
+            } else {
+                rtnMessage = GYC08MessageId.GYC08E038;
+                // エラーメッセージ作成
+                errMsg = MessageFormat.format(this.messageAccessor.getText(rtnMessage), idoDto.getNameCd(), gYCIdoJohoSinJyhDto.getSIdoCd());
+                idoDto.setErrMsg(errMsg);
+                // エラーコードを返却
+                return rtnMessage;
+            }
+        }
+        
+        //GY055:在職区分コード
+        if (!KoseiStringUtils.isEmpty(gYCIdoJohoSinJyhDto.getSZaishokKbnCd())) {
+            afterCode = codeChkUtil(jsysCodeChgMap,GYCIdoJohoConst.TOUITSUCD_ZAISHOKKBNCD, gYCIdoJohoSinJyhDto.getSJsysSbtCd(), gYCIdoJohoSinJyhDto.getSZaishokKbnCd());
+            if (afterCode != null) {
+                // 変換後のコードに置き換える。
+                gYCIdoJohoSinJyhDto.setSZaishokKbnCd(afterCode);
+            } else {
+                rtnMessage = GYC08MessageId.GYC08E039;
+
+                // エラーメッセージ作成
+                errMsg = MessageFormat.format(this.messageAccessor.getText(rtnMessage), idoDto.getNameCd(), gYCIdoJohoSinJyhDto.getSZaishokKbnCd());
+                idoDto.setErrMsg(errMsg);
+                // エラーコードを返却
+                return rtnMessage;
+            }
+        }
+        
+        
+        //GY098:勤務先都道府県コード
+        if (!KoseiStringUtils.isEmpty(gYCIdoJohoSinJyhDto.getSKinmusakitodoufukenCd())) {
+            afterCode = codeChkUtil(jsysCodeChgMap,GYCIdoJohoConst.TOUITSUCD_TODOFUKEN, gYCIdoJohoSinJyhDto.getSJsysSbtCd(), gYCIdoJohoSinJyhDto.getSKinmusakitodoufukenCd());
+            if (afterCode != null) {
+                // 変換後のコードに置き換える。
+                gYCIdoJohoSinJyhDto.setSKinmusakitodoufukenCd(afterCode);
+            } else {
+                rtnMessage = GYC08MessageId.GYC08E060;
+
+                // エラーメッセージ作成
+                errMsg = MessageFormat.format(this.messageAccessor.getText(rtnMessage), idoDto.getNameCd(), gYCIdoJohoSinJyhDto.getSKinmusakitodoufukenCd());
+                idoDto.setErrMsg(errMsg);
+                // エラーコードを返却
+                return rtnMessage;
+            }
+           
+        }
+        
+        
+        
+        
+        // 会社コード変換
+        
+        //会社コード
+        if (!KoseiStringUtils.isEmpty(gYCIdoJohoSinJyhDto.getSKaishaCd())) {
+            afterCode = kaishaCodeChg(kaishaCodeChgMap,gYCIdoJohoSinJyhDto.getSJsysSbtCd(), gYCIdoJohoSinJyhDto.getSKaishaCd());
+            if (!KoseiStringUtils.isEmpty(afterCode)) {
+                this.klogger.debug("会社コード変換　変換前会社コード{} ：変換後会社コード{}", gYCIdoJohoSinJyhDto.getSKaishaCd(), afterCode);
+                // 変換されてきたら、変換後のコードに置き換える。
+                gYCIdoJohoSinJyhDto.setSKaishaCd(afterCode);
+            }
+        }
+        
+        //出身会社コード
+        if (!KoseiStringUtils.isEmpty(gYCIdoJohoSinJyhDto.getSShussinKaishaCd())) {
+            afterCode = kaishaCodeChg(kaishaCodeChgMap,gYCIdoJohoSinJyhDto.getSJsysSbtCd(), gYCIdoJohoSinJyhDto.getSShussinKaishaCd());
+            if (!KoseiStringUtils.isEmpty(afterCode)) {
+                this.klogger.debug("出身会社コード変換　変換前会社コード{} ：変換後会社コード{}", gYCIdoJohoSinJyhDto.getSShussinKaishaCd(), afterCode);
+                // 変換されてきたら、変換後のコードに置き換える。
+                gYCIdoJohoSinJyhDto.setSShussinKaishaCd(afterCode);
+            }
+        }
+
+        //給与支給会社コード
+        if (!KoseiStringUtils.isEmpty(gYCIdoJohoSinJyhDto.getSKyuyoSikyukaishaCd())) {
+            afterCode = kaishaCodeChg(kaishaCodeChgMap,gYCIdoJohoSinJyhDto.getSJsysSbtCd(), gYCIdoJohoSinJyhDto.getSKyuyoSikyukaishaCd());
+            if (!KoseiStringUtils.isEmpty(afterCode)) {
+                this.klogger.debug("給与支給会社コード変換　変換前会社コード{} ：変換後会社コード{}", gYCIdoJohoSinJyhDto.getSKyuyoSikyukaishaCd(), afterCode);
+                // 変換されてきたら、変換後のコードに置き換える。
+                gYCIdoJohoSinJyhDto.setSKyuyoSikyukaishaCd(afterCode);
+            }
+        }
+
+        
+        //勤務先ビル会社コード
+        if (!KoseiStringUtils.isEmpty(gYCIdoJohoSinJyhDto.getSKinmusakibuildingkaishaCd())) {
+            afterCode = kaishaCodeChg(kaishaCodeChgMap,gYCIdoJohoSinJyhDto.getSJsysSbtCd(), gYCIdoJohoSinJyhDto.getSKinmusakibuildingkaishaCd());
+            if (!KoseiStringUtils.isEmpty(afterCode)) {
+                this.klogger.debug("勤務先ビル会社コード変換　変換前会社コード{} ：変換後会社コード{}", gYCIdoJohoSinJyhDto.getSKinmusakibuildingkaishaCd(), afterCode);
+                // 変換されてきたら、変換後のコードに置き換える。
+                gYCIdoJohoSinJyhDto.setSKinmusakibuildingkaishaCd(afterCode);
+            }
+        }
+        
+        
+        // N+X⇒N変換
+        // 社員現住所１
+        if(!KoseiStringUtils.isEmpty(gYCIdoJohoSinJyhDto.getSSihGenjusyo1())) {
+            gYCIdoJohoSinJyhDto.setSSihGenjusyo1(KoseiStringUtils.halfToFull(gYCIdoJohoSinJyhDto.getSSihGenjusyo1()));
+        }
+        
+        // 社員現住所２
+        if(!KoseiStringUtils.isEmpty(gYCIdoJohoSinJyhDto.getSSihGenjusyo2())) {
+            gYCIdoJohoSinJyhDto.setSSihGenjusyo2(KoseiStringUtils.halfToFull(gYCIdoJohoSinJyhDto.getSSihGenjusyo2()));
+        }
+        
+
+
+        //エラーなし
+        return GYC08MessageId.GYC08I000;
+
+    }
+
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void henkanDtoListAdd(GYC08IdoJohoHPDto gYC08IdoJohoHPDto,
+            GYCIdoJohoDtoAbst idoJohoDtoAbst) {
+        
+        // 振分前DTOの社員情報に登録する。
+        gYC08IdoJohoHPDto.getLstGYCIdoJohoSinJyhDto().add((GYCIdoJohoSinJyhDto)idoJohoDtoAbst);
+        
+    }
+
+
+
+
+
+
+
+
+
+
+
+}
