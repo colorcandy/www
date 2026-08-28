@@ -1,60 +1,22 @@
 /**
-     * 文字単位右パディング処理。
-     *
-     * <p>[概 要] 文字単位右パディングを行う。</p>
+     * コンストラクタ。
+     * 
+     * <p>[概 要] コンストラクタ。</p>
      * <p>[詳 細] <br>
-     * 変換対象文字列を全角1文字とし、指定文字数、指定文字で右パディングした文字列へ変換する。
+     * コンストラクタ。
      * </p>
      * <p>[備 考] </p>
-     *
-     * @param string 変換対象文字列
-     * @param ｌength 指定文字数
-     * @param padChar 指定文字
-     *
-     * @return 変換後文字列
      */
-    private String rpaddingMojiSu(String string, int ｌength, char padChar) {
-
-        KoseiAssert.isTrue(0 < ｌength);
-
-        if (string == null) {
-            return null;
-        }
-
-        // 変換対象文字列の文字数を算出する
-        int mojiSu = 0;
-
-        int codePoint;
-        for (int i = 0; i < string.length(); i += Character.charCount(codePoint)) {
-            codePoint = string.codePointAt(i);
-            String checkString = new String(new int[] {codePoint}, 0, 1);
-
-            if (FULL_WIDTH_CHARS.containsAll(checkString)) {
-                // 全角の場合、2バイト
-                mojiSu += 1;
-
-            } else {
-                throw new KoseiSystemException("string is not system string " + string);
-            }
-        }
-
-        // 変換対象文字列の文字数が指定バイト数以上の場合、処理を終了する。
-        if (mojiSu >= ｌength) {
-            return string;
-        }
-
-        // 指定文字数になるまで指定文字をパディングする。
-        StringBuilder builder = new StringBuilder();
-
-        builder.append(string);
-
-        int length = (ｌength - mojiSu);
-        for (int i = 0; i < length; i++) {
-            builder.append(padChar);
-        }
-
-        // 変換後対象文字を返却する。
-        return builder.toString();
+    public KoseiFullWidthChars() {
+        super(/* JIS非漢字 */ new KoseiSpecialChars()
+                .union(/* JIS X 0208 の3区：英数字 */ new JIS_X_0208_LatinLetters())
+                .union(/* JIS X 0208 の4区：ひらがな */ new JIS_X_0208_Hiragana())
+                .union(/* 全角カタカナ */ new KoseiFullWidthKatakanaChars())
+                .union(/* JIS X 0208 の6区：ギリシア文字 */ new JIS_X_0208_GreekLetters())
+                .union(/* JIS X 0208 の7区：キリル文字 */ new JIS_X_0208_CyrillicLetters())
+                .union(/* JIS X 0208 の8区：罫線素片 */ new JIS_X_0208_BoxDrawingChars())
+                .union(/* JIS X 208で規定される漢字 第1、第2水準漢字 */ new JIS_X_0208_Kanji())
+                .union(/* NEC特殊文字 */ new KoseiNECSpecialChars())
+                .union(/* NEC選定IBM拡張文字 */ new KoseiNECSelectionsIBMExtensionChars())
+                .union(/* IBM拡張文字 */ new KoseiIBMExtensionChars()));
     }
-
-氏名　田見1135770
